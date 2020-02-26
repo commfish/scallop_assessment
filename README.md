@@ -1,2 +1,2 @@
 # scallop_assessment
-Development of a model based stock assessment for scallops
+A respository for the assessment of weathervane scallops. Currently will house explatory data analysis related to development of an assessment framework. More detailed README to follow...
