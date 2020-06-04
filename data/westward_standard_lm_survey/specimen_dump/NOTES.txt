@@ -1,0 +1,3 @@
+Link to data download via kodweb: http://kodweb.fishgame.state.ak.us/apps/trawl/lgmesh/reports/crabdump/index
+
+File name changed from catchDump tp specimenDump
