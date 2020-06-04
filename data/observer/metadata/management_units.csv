@@ -1,0 +1,24 @@
+Region,Area,Area_code,District_name,District_code
+Southeast,Southeast,A,N/A,-7
+Southeast,Yakutat,D,Yakutat,YAK
+Southeast,Yakutat,D,District 16,D16
+Central,Cook Inlet,H,Northern,N
+Central,Cook Inlet,H,Central,HC
+Central,Cook Inlet,H,Southern,S
+Central,Cook Inlet,H,Kamishak Bay,KAM
+Central,Cook Inlet,H,Barren Islands,BAR
+Central,Cook Inlet,H,Outer,OUT
+Central,Cook Inlet,H,Eastern,E
+Central,Prince William Sound,E,East Kayak Island,EKI
+Central,Prince William Sound,E,West Kayak Island,WKI
+Westward,Kodiak,K,Northeast,KNE
+Westward,Kodiak,K,Shelikof,KSH
+Westward,Kodiak,K,Semidi Islands,KSEM
+Westward,Kodiak,K,Southeast,KSE
+Westward,Kodiak,K,Southwest,KSW
+Westward,AK Peninsula,M,Unimak Bight,UB
+Westward,AK Peninsula,M,Central,C
+Westward,AK Peninsula,M,West Chignik,WC
+Westward,Dutch Harbor,O,Dutch Harbor,O
+Westward,Bering Sea,Q,Bering Sea,Q
+Westward,Adak,R,Adak,R
