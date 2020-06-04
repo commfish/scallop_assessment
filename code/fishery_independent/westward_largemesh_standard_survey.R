@@ -30,7 +30,9 @@ do.call(bind_rows, lapply(paste0("data/observer_data_summary/raw_data/catch/",
   # add season
   f_add_season() %>%
   # correct districts
-  f_revise_district() -> logbook
+  f_revise_district() %>%
+  # phantom ranom removal
+  filter(Season != "NA/NA") -> logbook
 
 ## shapefile of district boundary lines (f_shp_prep, from adfg_map_functions.R)
 ## loaded in load_clean_westward_standard_largemesh_data.R)
@@ -52,7 +54,7 @@ wslm_catch %>%
                      data_type = "Fishery") %>%
               rename(lon = set_lon, lat = set_lat, district = District) %>%
               dplyr::select(Year, reg_area, district, lon, lat, data_type)) %>%
-  filter(Year >= 2015) -> tmp
+  filter(Year >= 2014) -> tmp
 
 ## Area K
 f_base_map+
@@ -100,19 +102,6 @@ f_base_map+
 ggsave("./figures/fishery_independent/2020/trawl_survey_vs_fishery_locations_area_M.png",
        plot = x,
        height = 7, width = 7, units = "in")
-
-f_base_map+
-  geom_line(data = district_boundaries, aes(x = long, y = lat, group = group))+
-  geom_point(data = filter(tmp, reg_area == "M", data_type == "Trawl Survey"),
-             aes(x = lon, y = lat, color = district))+
-  labs(color = NULL)+
-  scale_color_manual(values = cb_palette[c(4, 6, 7)])+
-  coord_quickmap(xlim = c(-165, -155), ylim = c(53.7, 57))+
-  facet_wrap(~Year, ncol = 2) -> x
-ggsave("./figures/fishery_independent/2020/trawl_survey_vs_fishery_locations_area_M.png",
-       plot = x,
-       height = 7, width = 7, units = "in")
-
 
 
 # shell height composition ----
@@ -279,13 +268,13 @@ tmp %>%
          l95 = cpue_scaled - 1.96 * abs((cv * cpue_scaled)),
          u95 = cpue_scaled + 1.96 * abs((cv * cpue_scaled)),
          data_type = "Trawl Survey") %>%
-  bind_rows(read_csv("./data/observer_data_summary/2020/standardized_cpue_season_KSE.csv") %>%
-              mutate(Year = as.numeric(substring(Season, 1, 4)),
-                     cpue_scaled = as.numeric(scale(std_cpue)),
-                     data_type = "Fishery (Standardized)") %>%
-              dplyr::select(Year, cpue_scaled, data_type) %>%
-              filter(Year > 2010)) %>%
-  mutate(data_type = factor(data_type, levels = c("Trawl Survey", "Fishery (Standardized)"))) %>%
+  # bind_rows(read_csv("./data/observer_data_summary/2020/standardized_cpue_season_KSE.csv") %>%
+  #             mutate(Year = as.numeric(substring(Season, 1, 4)),
+  #                    cpue_scaled = as.numeric(scale(std_cpue)),
+  #                    data_type = "Fishery (Standardized)") %>%
+  #             dplyr::select(Year, cpue_scaled, data_type) %>%
+  #             filter(Year > 2010)) %>%
+  # mutate(data_type = factor(data_type, levels = c("Trawl Survey", "Fishery (Standardized)"))) %>%
   ggplot()+
   geom_errorbar(aes(x = factor(Year), ymin = l95, ymax = u95, color = data_type), width = 0.2)+
   geom_point(aes(x = factor(Year), y = cpue_scaled, color = data_type))+
@@ -327,7 +316,7 @@ ggsave("./figures/fishery_independent/2020/scaled_cpue_M.png", plot = x, height 
 # maps of cpue ----
 
 wslm_catch %>%
-  filter(Year >= 2015) %>%
+  filter(Year >= 2014) %>%
   # add area swept, net width = 0.0122 km
   # add round weight cpue
   mutate(area_swept = distance_km * 0.0122,
@@ -360,3 +349,15 @@ ggsave("./figures/fishery_independent/2020/trawl_survey_cpue_map_area_M.png",
        plot = x,
        height = 7, width = 7, units = "in")
 
+# area O
+f_base_map +
+  geom_line(data = district_boundaries, aes(x = long, y = lat, group = group))+
+  geom_point(data = filter(tmp, reg_area == "O"), 
+             aes(x = lon, y = lat, size = rw_cpue), 
+             alpha = 0.5, color = cb_palette[6])+
+  labs(size = "Round Weight CPUE (kg / sq km)")+
+  coord_quickmap(xlim = c(-169, -164.2), ylim = c(52.5, 54.5))+
+  facet_wrap(~Year, ncol = 2)  -> x
+ggsave("./figures/fishery_independent/2020/trawl_survey_cpue_map_area_O.png",
+       plot = x,
+       height = 7, width = 7, units = "in")
