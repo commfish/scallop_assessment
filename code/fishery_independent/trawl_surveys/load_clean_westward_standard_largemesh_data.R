@@ -14,11 +14,12 @@ source("./code./misc/adfg_map_functions.R")
 f_shp_prep("./data/maps/mgmt_units", "Scallop_Statewide_Areas_PY", fortify = F) %>%
   spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> reg_areas
 
-## district polygons (currently only area K and M) for classifying district in survey tows
+# ## district polygons (currently only area K and M) for classifying district in survey tows
 f_shp_prep("./data/maps/mgmt_units", "Scallop_KM_Districts_wgs84", fortify = F) %>%
   spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> district_polygons
 
-## load raw catch and specimen dump from standard survey stations 1988 - present
+
+# ## load raw catch and specimen dump from standard survey stations 1988 - present
 ## data contacts: Kally Spallinger, Ric Shepard, Mike Knutsen (ADF&G Kodiak)
 
 ## catch data

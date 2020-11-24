@@ -84,15 +84,9 @@ f_catch_by_tow <- function(x, y){
 ## separate SHAW data from all speciemen data
 ## args
 ### x - raw specimen data (2019 - present format)
-### y - cleaned catch by tow data (see output of f_catch_by_tow)
-f_get_shaw <- function(x, y) {
+f_get_shaw <- function(x) {
   x %>%
-    filter(!is.na(whole_wt)) %>%
-    dplyr::select(-samptime) %>%
-    left_join(y %>%
-                dplyr::select(tow, year, bed_code), 
-              by = "tow") %>%
-    dplyr::select(16:17, 1:15)
+    filter(!is.na(sex))
 } 
 
 ## separate shell height and damage data from all specimen data, compute sample factor
@@ -100,17 +94,19 @@ f_get_shaw <- function(x, y) {
 ### x - raw specimen data (2019 - present format)
 ### y - cleaned catch by tow data (see output of f_catch_by_tow)
 f_get_shad <- function(x, y){
-  specimen %>%
-    dplyr::select(-whole_wt, -sex, -shell_num, -shell_id, -gonad, -meat_condition, -mud_blister,
-                  -shell_worm, -shell_retained, -meat_weight, -samptime) %>%
-    group_by(tow, rcode, samp_grp, size, damage) %>%
+  x %>%
+    filter(samp_grp %in% c(1, 2)) %>%
+    dplyr::select(-whole_wt, -sex, -shell_num, -gonad, -meat_condition, -mud_blister,
+                  -shell_worm, -shell_retained, -meat_wt) %>%
+    group_by(year, tow, samp_grp, size, damage) %>%
     summarise(count = n()) %>%
     group_by(tow, samp_grp) %>%
     mutate(n_measured = sum(count)) %>%
     left_join(y %>%
+                filter(rcode == 74120) %>%
                 dplyr::select(year, cruise, tow, haul, bed_code, lat, lon, avg_depth,
                                area_swept, rcode, samp_grp, samp_cnt),
-              by = c("tow", "rcode", "samp_grp")) %>%
+              by = c("tow", "samp_grp", "year")) %>%
     mutate(sample_factor = samp_cnt * (count / n_measured)) %>%
     dplyr::select(year, cruise, tow, haul, bed_code, lat, lon, avg_depth, area_swept,
                   rcode, samp_grp, size, damage, sample_factor)
