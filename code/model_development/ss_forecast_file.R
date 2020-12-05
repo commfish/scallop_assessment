@@ -24,22 +24,22 @@ SSversion <- "3.30"
 benchmarks <- 0 # omit
 
 ## msy estimation method
-MSY <- 1 # Fspr as a proxy
+#MSY <- 1 # Fspr as a proxy
 
 ## SPR target value
-SPRtarget <- 0.45 # from manual - update later
+#SPRtarget <- 0.45 # from manual - update later
 
 ## realtive biomass target
-Btarget <- 0.4 # from manual
+#Btarget <- 0.4 # from manual
 
 ## benchmark years
-Bmark_years <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+#Bmark_years <- c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 ## benchmark relative F basis
-Bmark_relF_Basis <- 2 # set range for relF the same as the forecast
+#Bmark_relF_Basis <- 2 # set range for relF the same as the forecast
 
 ## forecast
-Forecast <- -1 # none
+Forecast <- 0 # none
 
 # list objects and write file ----
 

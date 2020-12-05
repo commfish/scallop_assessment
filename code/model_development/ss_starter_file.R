@@ -18,7 +18,7 @@ SSversion <- "3.30"
 
 # .dat and .ctl files ----
 datfile <- "ksh_dat.ss"
-ctlfile <- "ksh_ctl.ctl"
+ctlfile <- "ksh_ctl.ss"
 
 # settings ----
 ## (pg 9 SS 3.30.16 user manual)

@@ -150,7 +150,7 @@ N_discard_fleets <- 0
 
 # shell height comps ----
 ## length bin method (pg 49 of SS 3.30.16 user manual)
-lbin_method <- 2
+lbin_method <- 1
 
 ## use length comp (1, 0)
 use_lencomp <- 1
@@ -256,7 +256,7 @@ agebin_vector <- 1:18
 N_ageerror_definitions <- 2
 
 ## aging error matrix
-ageerror <- read.csv("./data/stock_synthesis/ksh/age_error_defs.csv")
+ageerror <- read.csv("./data/stock_synthesis/ksh/age_error_defs.csv") 
 
 ## age info (pg 57 of SS 3.30.16 user manual)
 age_info <- data.frame(mintailcomp = c(0, 0, 0),
@@ -266,6 +266,9 @@ age_info <- data.frame(mintailcomp = c(0, 0, 0),
                        CompError = c(0, 0, 0),
                        ParmSelect = c(0, 0, 0),
                        minsamplesize = c(1, 1, 1))
+
+## length bin for ages
+Lbin_method <- 2
 
 ## age composition
 ### fishery ages
@@ -280,11 +283,11 @@ fishery_ages %>%
   summarise_all(sum) %>%
   ungroup %>%
   mutate(month = 7, 
-         fleet = 3, 
+         fleet = 1, 
          sex = 0,
          part = 0,
          ageerr = 1,
-         Lbin_lo = -1, 
+         Lbin_lo = 1, 
          Lbin_hi = -1,
          age = paste0("a", age)) %>%
   dplyr::select(yr, month, fleet, sex, part, ageerr, Lbin_lo, Lbin_hi, Nsamp, age, count) %>%
@@ -307,7 +310,7 @@ dredge_survey_ages %>%
          sex = 0,
          part = 0,
          ageerr = 1,
-         Lbin_lo = -1, 
+         Lbin_lo = 1, 
          Lbin_hi = -1,
          age = paste0("a", age)) %>%
   dplyr::select(yr, month, fleet, sex, part, ageerr, Lbin_lo, Lbin_hi, Nsamp, age, n) %>%
@@ -317,8 +320,9 @@ bind_rows(fishery1_agecomp, dredge_agecomp) %>%
   # reorder columns so ages are in order
   dplyr::select(1:9, 26:27, 10:23, 25, 24) %>%
   replace_na(list(a1 = 0, a2 = 0, a17 = 0, a18 = 0)) %>%
-  as.data.frame() -> agecomp
+    as.data.frame() -> agecomp
   
+use_MeanSize_at_Age_obs <- 0
 
 # additional information ----
 
@@ -355,6 +359,7 @@ list(sourcefile = sourcefile,
      areas = areas, 
      catch = catch, 
      CPUEinfo = CPUEinfo, 
+     CPUE = CPUE,
      N_discard_fleets = N_discard_fleets,
      use_meanbodywt = use_meanbodywt, 
      lbin_method = lbin_method,
@@ -365,9 +370,12 @@ list(sourcefile = sourcefile,
      lencomp = lencomp, 
      N_agebins = N_agebins,
      agebin_vector = agebin_vector,   
-     N_ageerror_definitions = N_ageerror_definitions, 
+     N_ageerror_definitions = N_ageerror_definitions,
+     ageerror = ageerror,
      age_info = age_info, 
      agecomp = agecomp, 
+     use_MeanSize_at_Age_obs = use_MeanSize_at_Age_obs,
+     Lbin_method = Lbin_method,
      N_environ_variables = N_environ_variables, 
      do_tags = do_tags, 
      morphcomp_data = morphcomp_data, 

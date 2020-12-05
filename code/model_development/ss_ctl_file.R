@@ -8,11 +8,11 @@
 library(r4ss)
 library(tidyverse)
 
-ctl <- SS_readctl("./code/stock_synthesis/SSI/default/simple_ctl.ss")
-
-SS_readctl("./code/stock_synthesis/test/ksh_ctl.ctl")
-
-SS_readctl("./code/stock_synthesis/kamishak/ks1.ctl", version = "3.24")
+# ctl <- SS_readctl("./code/stock_synthesis/SSI/default/simple_ctl.ss")
+# 
+# SS_readctl("./code/stock_synthesis/test/ksh_ctl.ctl")
+# 
+# SS_readctl("./code/stock_synthesis/kamishak/ks1.ctl", version = "3.24")
 
 ## clear env so you don't introduce unwanted object
 rm(list = ls())
@@ -60,7 +60,7 @@ recr_dist_inx <- 0
 
 ## recruitment pattern info (pg 76 of SS 3.30 user manual)
 recr_dist_pattern <- data.frame(GPattern = 1,
-                                month = 1, 
+                                month = 4, 
                                 area = 1,
                                 age = 0)
 
@@ -71,17 +71,16 @@ recr_dist_pattern <- data.frame(GPattern = 1,
 ## number of time blocks (pg 80 of SS 3.30 user manual)
 N_Block_Designs <- 0 # no time blocks
 blocks_per_pattern <- 0
+#Block_Design <- c(1993, 1993)
 ## auto generation
 time_vary_adjust_method <- 1
-time_vary_auto_generation <- c(1, 1, 1, 1, 1)
+time_vary_auto_generation <- c(0, 0, 0, 0, 0)
 
 
-# natural mortality ----
+# biology parameter setup  ----
 
 # set number of M parameters
 natM_type <- 0 # 1 parameter (pg 81 of SS 3.30 user manual)
-
-# growth and maturity ----
 
 ## choose growth model (pg 84 of SS 3.30 user manual)
 GrowthModel <- 1 #von Bertalanffy growth
@@ -122,14 +121,23 @@ hermaphroditism_option <- 0 # none
 parameter_offset_approach <- 1 # none
 
 ## growth parameter settings (from kamishak ctl file)
-read_csv("./data/stock_synthesis/ksh/growth_maturity_parameter_info.csv") %>%
+read_csv("./data/stock_synthesis/ksh/mortality_growth_parameter_info.csv") %>%
   column_to_rownames(., var = "param") %>%
   as.data.frame() -> MG_parms
 
 ## seasonal biology parameters (starts pg 98 of SS 3.30 user manual)
-MGparm_seas_effects <- rep(0, 10) 
-names(MGparm_seas_effects) <- c("femwtlen1", "femwtlen2", "mat1", "mat2", "fec1", "fec2",
-                                "Malewtlen1", "malewtlen2", "L1", "K")
+#MGparm_seas_effects <- rep(0, 10)
+MGparm_seas_effects <- data.frame(femwtlen1 = 0,
+                                  femwtlen2 = 0,
+                                  mat1 = 0,
+                                  mat2 = 0,
+                                  fec1 = 0,
+                                  fec2 = 0,
+                                  malewtlen1 = 0,
+                                  malewtlwn2 = 0,
+                                  L1 = 0,
+                                  K = 0)
+
 
 # spawner recruitment ---- 
 
@@ -198,23 +206,23 @@ maxF <- 2.9 # from KAMN ctl
 F_iter <- 4
 
 # inital f parameters
-tibble(LO = 0, 
-       HI = 1, 
-       INIT = 0, 
-       PROR = 0.01, 
-       SD = 99,
-       PR_type = 0, 
-       PHASE = -1, 
-       env_var = 0,
-       use_dev = 0,
-       dev_mnyr = 0,
-       dev_mxyr = 0,
-       dev_PH = 0,
-       Block = 0,
-       Blk_Fxn = 0,
-       param = "InitF_1FISHERY1") %>%
-  column_to_rownames(., var = "param") %>%
-  as.data.frame() -> init_F
+# tibble(LO = 0, 
+#        HI = 1, 
+#        INIT = 0, 
+#        PRIOR = 0.01, 
+#        SD = 99,
+#        PR_type = 0, 
+#        PHASE = -1, 
+#        env_var = 0,
+#        use_dev = 0,
+#        dev_mnyr = 0,
+#        dev_mxyr = 0,
+#        dev_PH = 0,
+#        Block = 0,
+#        Blk_Fxn = 0,
+#        param = "InitF_1FISHERY1") %>%
+#   column_to_rownames(., var = "param") %>%
+#   as.data.frame() -> init_F
 
 
 # catchability ----
@@ -224,7 +232,7 @@ tibble(LO = 0,
 Q_options <- tibble(fleet = c(2, 3),
                         link = c(1, 2), 
                         link_info = c(0, 2),
-                        extra_se = c(1, 0), 
+                        extra_se = c(1, 1), 
                         biasadj = c(0, 0),
                         float = c(0, 0),
                         fleetname = c("DREDGESURVEY", "TRAWLSURVEY")) %>%
@@ -237,9 +245,9 @@ tibble(LO = c(0.2, 0),
        HI = c(1, 0.5),
        INIT = c(0.83, 0),
        PRIOR = c(0.83, 0.05),
-       PR_SD = c(0.1, 0),
-       PR_type = c(-1, 1),
-       PHASE = c(5, -4),
+       PR_SD = c(0.1, 0.1),
+       PR_type = c(0, 1),
+       PHASE = c(5, -99),
        env_var = c(0, 0),
        use_dev = c(0, 0),
        dev_mnyr = c(0, 0),
@@ -251,13 +259,13 @@ tibble(LO = c(0.2, 0),
   bind_rows(., .) %>%
   mutate(param = c("LnQ_base_DREDGESURVEY", "Q_extaSD_DREDGESURVEY", "LnQ_base_TRAWLSURVEY", "Q_extaSD_TRAWLSURVEY")) %>%
   column_to_rownames(., var = "param") %>%
-  as.data.frame -> Q_params
+  as.data.frame -> Q_parms
 
 
 # selectivity ----
 
 ## size selectivty definitions for each fleet (pg 118-119 of SS 3.30 user manual)
-tibble(Pattern = c(1, 1, 5),
+tibble(Pattern = c(1, 1, 15),
        Discard = c(0, 0, 0),
        Male = c(0, 0, 0),
        Special = c(0, 0, 2),
@@ -283,6 +291,7 @@ tibble(LO = c(2, 0.01, 2, 0.01, 2, 0.01),
        param = c("SizeSel_P1_FISHERY1", "SizeSel_P2_FISHERY1", "SizeSel_P1_DREDGESURVEY", 
                  "SizeSel_P2_DREDGESURVEY", "SizeSel_P1_TRAWLSURVEY", "SizeSel_P2_TRAWLSURVEY")) %>%
   column_to_rownames(., var = "param") %>%
+  slice(-5, -6) %>%
   as.data.frame -> size_selex_parms
 
 ## age selectivty definitions for each fleet (pg 119 of SS 3.30 user manual)
@@ -347,3 +356,4 @@ more_stddev_reporting <- 0
 
 as.list(environment()) %>%
   SS_writectl("./code/stock_synthesis/ksh/ksh_ctl.ss", overwrite = T, verbose = T)
+
