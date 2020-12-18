@@ -68,26 +68,42 @@ catch <- f_catch_by_tow(catch_raw, tows)
 shaw <- f_get_shaw(specimen)
 shad <- f_get_shad(specimen, catch)
 
-## remove tow 54 from 2019 (towed twice)
-tows <- filter(tows, tow != 19010054)
-catch <- filter(catch, tow != 19010054)
-shaw <- filter(shaw, tow != 19010054)
-shad <- filter(shad, tow != 19010054)
+## remove tow 54 from 2019 (towed twice) and change name of bed (YAKB -> EK1)
+filter(tows, tow != 19010054) %>%
+  ## change the name of the east side of EK1
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) -> tows
+filter(catch, tow != 19010054) %>%
+  ## change the name of the east side of EK1
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) -> catch
+filter(shaw, tow != 19010054) %>%
+  ## change the name of the east side of EK1
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) -> shaw
+filter(shad, tow != 19010054) %>%
+  ## change the name of the east side of EK1
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) -> shad
 
 ## edit strata so that YAKB gets the code EK1 for consistency
 strata %>%
+  # filter for only active stations
+  filter(status == "active") %>%
   ## remove data for west side of EK1
   filter(bed_code != "EK1") %>%
-  ## chand the name of the east side of EK1
-  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) -> strata
+  ## change the name of the east side of EK1
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) %>%
+  # compute bed area
+  group_by(bed_code) %>%
+  summarise(area_nm2 = sum(area_nmi2_alb),
+            n_stations = n()) %>%
+  # filter for beds surveyed
+  filter(bed_code %in% bed_levels) -> bed_area
 
 # table of tows by bed ----
 tows %>%
   count(year, bed_code) %>%
-  left_join(strata, by = "bed_code") %>%
+  left_join(bed_area, by = "bed_code") %>%
   mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   arrange(bed_code) %>%
-  dplyr::select(year, bed_code, n, grids, area_nm2) %T>%
+  dplyr::select(year, bed_code, n, n_stations, area_nm2) %T>%
   # write output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2020/2019_2020_strata.csv")
 
@@ -97,7 +113,7 @@ tows %>%
 ## point estimates (rnd wt biomass in lbs)
 catch %>%
   filter(rcode == 74120) %>%
-  left_join(strata, by = "bed_code") %>%
+  left_join(bed_area, by = "bed_code") %>%
   group_by(year, samp_grp, bed_code) %>%
   summarise(cpue_abund = mean(cpue_cnt, na.rm = T),
             abundance = mean(cpue_cnt, na.rm = T) * mean(area_nm2),
@@ -160,7 +176,7 @@ shaw %>%
                   u_i = 0)) %>%
   # compute total meat weight biomass
   left_join(n_tows, by = c("year", "bed_code")) %>%
-  left_join(strata, by = "bed_code") %>%
+  left_join(bed_area, by = "bed_code") %>%
   
   group_by(year, bed_code) %>%
   summarise(mw_biomass = mean(u_i, na.rm = T) * mean(area_nm2),
@@ -324,7 +340,29 @@ ggsave("./figures/fishery_independent/2020/2019_2020_dredge_survey_rwt_mwt.png",
 ggsave("./figures/fishery_independent/2020/2020_dredge_survey_rwt_mwt.png", plot = p2,
        width = 6, height = 4, units = "in")
 
-# pathologies ----
+# pathologies and sex ratio ----
+
+# extract prop estimate and p-value
+f_p_prop <- function(x) {
+  tibble(prop_est = x$estimate,
+         prop_conf = paste0("[", round(x$conf.int[1], 2), ", ", round(x$conf.int[2], 2), "]"),
+         pval = x$p.value)
+}
+
+shaw %>%
+  filter(samp_grp == 1) %>%
+  mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
+  group_by(year, bed_code) %>%
+  summarise(sex_rat = sum(sex == 1) / sum(sex == 2),
+            n_male = sum(sex == 1),
+            n_shucked = n()) %>%
+  mutate(prop_test = purrr::map2(n_male, n_shucked, prop.test),
+         res = purrr::map(prop_test, f_p_prop)) %>%
+  unnest(res) %>%
+  # write output table
+  dplyr::select(-prop_test) %T>%
+  write_csv("./output/fishery_independent/statewide_scallop_survey/2020/sex_ratio_by_bed.csv")
+
 
 ## weak meats
 shaw %>% 
