@@ -6,7 +6,9 @@
 
 # load ----
 library(tidyverse)
+library(sf)
 library(magrittr)
+library(scales)
 library(FNGr)
 # for fitting lme and glme
 library(lme4)
@@ -33,7 +35,7 @@ set.seed(8456)
 # data ----
 
 ## logbook data
-read_csv("./data/statewide_scallop_survey/logbook/Cruise1901_2001_FishingLogData.csv") %>%
+read.csv("./data/statewide_scallop_survey/logbook/survey_log_ts_temporary.csv") %>%
   rename(year = cruise_year,
          start_lat = lat_start,
          start_lon = lon_start,
@@ -45,14 +47,14 @@ read_csv("./data/statewide_scallop_survey/logbook/Cruise1901_2001_FishingLogData
          avg_depth = depth_avg) -> logbook
 
 ## catch data
-read_csv("./data/statewide_scallop_survey/catch/Cruise1901_2001_ScallopCatchAndBycatchData.csv") %>%
+read.csv("./data/statewide_scallop_survey/catch/survey_catch_ts_temporary.csv") %>%
   rename(year = cruise_year,
          bed_code = bed_name) -> catch_raw
 
 ## specimen data
-read_csv("./data/statewide_scallop_survey/specimen/Cruise1901_2001_ScallopShellHeightAndDamageData.csv") %>%
-  mutate(damage = as.character(damage)) %>%
-  bind_rows(read_csv("./data/statewide_scallop_survey/specimen/Cruise1901_2001_ScallopShellHeightAndWeightData.csv")) %>%
+read.csv("./data/statewide_scallop_survey/specimen/survey_specimen_ts_temporary.csv") %>%
+  #mutate(damage = as.character(damage)) %>%
+  #bind_rows(read_csv("./data/statewide_scallop_survey/specimen/Cruise1901_2001_ScallopShellHeightAndWeightData.csv")) %>%
   rename(year = cruise_year,
          size = shell_height,
          bed_code = bed_name)  -> specimen
@@ -97,6 +99,179 @@ strata %>%
   # filter for beds surveyed
   filter(bed_code %in% bed_levels) -> bed_area
 
+# maps of tows ----
+
+## vessel tracks
+logbook %>%
+  filter(haul_type %in% c("10", "Standard"),
+         tow != 19010054) %>%
+  dplyr::select(bed_code, stn_id, start_lat, start_lon, end_lat, end_lon) %>%
+  unite(start_lat, start_lon, col = "start") %>%
+  unite(end_lat, end_lon, col = "end") %>%
+  pivot_longer(c(start, end), names_to = "position", values_to = "coords") %>%
+  separate(col = coords, into = c("y", "x"), sep = "_", convert = T) %>%
+  mutate(station = ifelse(bed_code == "WK1", 
+                          paste0(substring(stn_id, 2, 2), " ", substring(stn_id , 3, 4)),
+                          paste0(substring(stn_id, 2, 3), " ", substring(stn_id , 4, 6)))) %>%
+  dplyr::select(-bed_code) -> vessel_track
+
+## grid shapefile
+f_shp_prep(path = "./data/maps/statewide_scallop_survey_grid", 
+           layer = "scalGrid2020_standard_wgs84",
+           fortify = F) %>%
+  spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> survey_grid
+
+fortify(survey_grid) %>%
+  full_join(fortify(survey_grid@data), by = "id") %>%
+  mutate(towed = station %in% vessel_track$station) -> survey_grid
+
+##KSH and KNE map
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-154, -151.2), ylim = c(56.6, 58.8))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c(NA, "firebrick"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2020/kshkne_dredge_survey_map.png", plot = x,
+       height = 6, width = 6, units = "in")
+
+##YAK map
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c(NA, "firebrick"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2020/yak_dredge_survey_map_a.png", plot = x,
+       height = 4, width = 6, units = "in")
+
+rbind(usa, can) %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-140, -137.5), ylim = c(58.4, 59.5))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c(NA, "firebrick"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2020/yak_dredge_survey_map_b.png", plot = x,
+       height = 4, width = 6, units = "in")
+
+
+## KSH map
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-154.1, -153.2), ylim = c(58.4, 58.8))+
+  ggspatial::annotation_scale(location = "tl")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c(NA, "grey80"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2020/ksh_dredge_survey_map.png", plot = x,
+       height = 5, width = 5, units = "in")
+
+## KNE maps
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-153, -151), ylim = c(56.6, 58.1))+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c(NA, "grey80"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map.png", plot = x,
+       height = 5, width = 5, units = "in")
+
+x +
+  ggspatial::annotation_scale(location = "bl")+
+  coord_sf(xlim = c(-153, -151.7), ylim = c(56.6, 57.4)) -> p1
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map_lower.png", plot = p1,
+       height = 5, width = 5, units = "in")
+
+x +
+  ggspatial::annotation_scale(location = "br")+
+  coord_sf(xlim = c(-152.3, -151), ylim = c(57.2, 58.1)) -> p1
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map_upper.png", plot = p1,
+       height = 5, width = 5, units = "in")
+
+# maps of cpue ----
+
+## KSH1
+catch %>%
+  filter(bed_code == "KSH1", 
+         rcode == 74120,
+         year == 2020,
+         samp_grp == 1) %>%
+  left_join(logbook %>%
+              dplyr::select(tow, stn_id), by = "tow") %>%
+  mutate(station = paste0(substring(stn_id, 2, 3), " ", substring(stn_id , 4, 6))) %>%
+  ungroup() %>%
+  dplyr::select(year, station, samp_grp, cpue_cnt) %>%
+  right_join(survey_grid, by = "station") -> cpue_grid
+
+
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-154.1, -153.2), ylim = c(58.4, 58.8))+
+  geom_polygon(data = filter(cpue_grid, bed_code == "KSH1"), aes(x = long, y = lat, group = group, fill = cpue_cnt), alpha = 0.75, color = 1)+
+  scale_fill_gradientn(colours = heat.colors(10, rev = T))+
+  theme(legend.position = "right")+
+  labs(x = "Long", y = "Lat", fill = "CPUE")-> x
+ggsave("./figures/fishery_independent/2020/ksh_large_cpue_abund_map.png", plot = x,
+       height = 12, width = 6, units = "in")
+
+
+## KNE
+catch %>%
+  filter(grepl("KNE", bed_code), 
+         rcode == 74120,
+         year == 2020,
+         samp_grp == 1) %>%
+  left_join(logbook %>%
+              dplyr::select(tow, stn_id), by = "tow") %>%
+  mutate(station = paste0(substring(stn_id, 2, 3), " ", substring(stn_id , 4, 6))) %>%
+  ungroup() %>%
+  dplyr::select(year, station, samp_grp, cpue_cnt) %>%
+  right_join(survey_grid, by = "station") -> cpue_grid
+
+
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-153, -151), ylim = c(56.6, 58.1))+
+  geom_polygon(data = filter(cpue_grid, grepl("KNE", bed_code)), aes(x = long, y = lat, group = group, fill = cpue_cnt), alpha = 0.75, color = 1)+
+  scale_fill_gradientn(colours = heat.colors(10, rev = T), trans = "log10")+
+  theme(legend.position = "right")+
+  labs(x = "Long", y = "Lat", fill = "CPUE")-> x
+ggsave("./figures/fishery_independent/2020/kne_large_cpue_abund_map.png", plot = x,
+       height = 12, width = 6, units = "in")
+
+  
 # table of tows by bed ----
 tows %>%
   count(year, bed_code) %>%
@@ -141,6 +316,75 @@ abundance_biomass %>%
   # print output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2020/abundance_rnd_biomass_by_bed.csv")
 
+## plots of abundance and biomass for presentation
+### KSH1
+#### abundance
+abundance_biomass %>%
+  filter(bed_code == "KSH1") %>%
+  ungroup() %>%
+  # add empty rows for skipped years
+  add_row(year = 2019, samp_grp = 1:2) %>%
+  ggplot(aes(x = year, y = abundance / 1000000, color = factor(samp_grp), shape = factor(samp_grp)))+
+  geom_point()+
+  geom_line()+
+  geom_errorbar(aes(x = year, ymin = abund_log_l95 / 1000000, ymax = abund_log_u95 / 1000000), width = 0.1)+
+  scale_color_manual(values = cb_palette[3:4], labels = c("large", "small"))+
+  scale_shape_discrete(labels = c("large", "small"))+
+  scale_y_continuous(labels = comma)+
+  labs(x = NULL, y = "Abundance (millions)", shape = NULL, color = NULL) -> x
+ggsave("./figures/fishery_independent/2020/ksh_dredge_survey_abundance.png", plot = x,
+       width = 5, height = 3, units = "in")
+#### biomass
+abundance_biomass %>%
+  filter(bed_code == "KSH1") %>%
+  ungroup() %>%
+  # add empty rows for skipped years
+  add_row(year = 2019, samp_grp = 1:2) %>%
+  ggplot(aes(x = year, y = biomass, color = factor(samp_grp), shape = factor(samp_grp)))+
+  geom_point()+
+  geom_line()+
+  geom_errorbar(aes(x = year, ymin = biomass_log_l95, ymax = biomass_log_u95), width = 0.1)+
+  scale_color_manual(values = cb_palette[3:4], labels = c("large", "small"))+
+  scale_shape_discrete(labels = c("large", "small"))+
+  scale_y_continuous(labels = comma)+
+  labs(x = NULL, y = "Biomass (round lb)", shape = NULL, color = NULL) -> x
+ggsave("./figures/fishery_independent/2020/ksh_dredge_survey_biomass.png", plot = x,
+       width = 5, height = 3, units = "in")
+
+### KNE
+#### abundance
+abundance_biomass %>%
+  filter(grepl("KNE", bed_code)) %>%
+  ungroup() %>%
+  mutate(class = case_when(samp_grp == 1 ~ "large", 
+                           samp_grp == 2 ~ "small")) %>%
+  ggplot(aes(x = bed_code, y = abundance / 1000000, fill = factor(year)))+
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single"))+
+  geom_errorbar(aes(x = bed_code, ymin = abund_log_l95 / 1000000, ymax = abund_log_u95 / 1000000), 
+                position = position_dodge2(preserve = "single"))+
+  facet_wrap(~class, scales = "free", ncol = 1)+
+  scale_fill_manual(values = cb_palette[c(3,8)])+
+  coord_cartesian(ylim = c(0, 6))+
+  labs(x = NULL, y = "Abundance (millions)", fill = NULL) -> x
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_abundance.png", plot = x,
+       width = 4, height = 5, units = "in")
+#### biomass
+abundance_biomass %>%
+  filter(grepl("KNE", bed_code)) %>%
+  ungroup() %>%
+  mutate(class = case_when(samp_grp == 1 ~ "large", 
+                           samp_grp == 2 ~ "small")) %>%
+  ggplot(aes(x = bed_code, y = biomass, fill = factor(year)))+
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single"))+
+  geom_errorbar(aes(x = bed_code, ymin =biomass_log_l95, ymax = biomass_log_u95), 
+                position = position_dodge2(preserve = "single"))+
+  scale_y_continuous(labels = comma)+
+  facet_wrap(~class, scales = "free", ncol = 1)+
+  scale_fill_manual(values = cb_palette[c(3,8)])+
+  labs(x = NULL, y = "Biomass (round lbs)", fill = NULL) -> x
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_biomass.png", plot = x,
+       width = 4, height = 5, units = "in")
+
 ## meat weight biomass
 ### number of scallops by bed
 catch %>%
@@ -158,6 +402,10 @@ tows %>%
 
 ### design based estimator
 shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
   filter(samp_grp == 1) %>%
   # calculate estimate sample variance of meat weight by tow, within bed
   group_by(year, bed_code, tow) %>%
@@ -177,7 +425,6 @@ shaw %>%
   # compute total meat weight biomass
   left_join(n_tows, by = c("year", "bed_code")) %>%
   left_join(bed_area, by = "bed_code") %>%
-  
   group_by(year, bed_code) %>%
   summarise(mw_biomass = mean(u_i, na.rm = T) * mean(area_nm2),
             var_mw_biomass = mean(area_nm2)^2 * (var(u_i, na.rm = T) / mean(n_tow)) + mean(area_nm2) * sum(c^2 * var_mw_bar, na.rm = T) / mean(n_tow)) %>%
@@ -191,9 +438,42 @@ shaw %>%
          ln_ci = paste0("[", round(ln_l95, 0), ", ", round(ln_u95, 0), "]")) %>%
   # rearrange rows
   mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
-  arrange(year, bed_code) %>%
+  arrange(year, bed_code) -> mw_biomass
+
+mw_biomass %>%
   ## print output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2020/mw_biomass_by_bed.csv")
+
+## plots of meat weight biomass in mtons for presentation
+### KSH1 
+mw_biomass %>%
+  filter(bed_code == "KSH1") %>%
+  ungroup() %>%
+  # add empty rows for skipped years
+  add_row(year = 2019) %>%
+  ggplot(aes(x = year, y = mw_biomass))+
+  geom_point(color = cb_palette[3])+
+  geom_line(color = cb_palette[3])+
+  geom_errorbar(aes(x = year, ymin = ln_l95, ymax = ln_u95), width = 0.1, color = cb_palette[3])+
+  scale_y_continuous(labels = comma)+
+  labs(x = NULL, y = "Biomass (lb meat)", shape = NULL, color = NULL) -> x
+ggsave("./figures/fishery_independent/2020/ksh_dredge_survey_mw_biomass.png", plot = x,
+       width = 5, height = 3, units = "in")
+
+
+### KNE
+mw_biomass %>%
+  filter(grepl("KNE", bed_code)) %>%
+  ungroup() %>%
+  ggplot(aes(x = bed_code, y = mw_biomass, fill = factor(year)))+
+  geom_col(position = position_dodge2(width = 0.9, preserve = "single"))+
+  geom_errorbar(aes(x = bed_code, ymin = ln_l95, ymax = ln_u95), 
+                position = position_dodge2(preserve = "single"))+
+  scale_fill_manual(values = cb_palette[c(3,8)])+
+  scale_y_continuous(labels = comma)+
+  labs(x = NULL, y = "Biomass (lb meat)", fill = NULL) -> x
+ggsave("./figures/fishery_independent/2020/kne_dredge_survey_mw_biomass.png", plot = x,
+       width = 6, height = 4, units = "in")
 
 ## bootstrap confidence intervals
 # catch %>%
@@ -251,6 +531,60 @@ ggsave("./figures/fishery_independent/2020/2019_2020_dredge_survey_size_comp.png
        width = 6, height = 7, units = "in")
 ggsave("./figures/fishery_independent/2020/2020_dredge_survey_size_comp.png", plot = p2,
        width = 6, height = 4, units = "in")
+
+
+## by bed and year
+### KSH
+shad %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(bed_code == "KSH1") %>%
+  ggplot()+
+  geom_histogram(aes(x = size, y = ..density.., weight = sample_factor),
+                 binwidth = 3, color = "black", fill = cb_palette[3])+
+  geom_vline(xintercept = 100, linetype = 2)+
+  facet_wrap(~year, ncol = 1, scales = "free_y")+
+  labs(x = "Shell Height (mm)", y = "Density") -> x
+
+ggsave("./figures/fishery_independent/2020/ksh1_dredge_survey_size_comp.png", plot = x,
+       width = 4, height = 6, units = "in")
+
+### KNE
+#### KNE 1-3
+shad %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(bed_code %in% c("KNE1", "KNE2", "KNE3")) %>%
+  ggplot()+
+  geom_histogram(aes(x = size, y = ..density.., weight = sample_factor),
+                 binwidth = 3, color = "black", fill = cb_palette[3])+
+  geom_vline(xintercept = 100, linetype = 2)+
+  facet_grid(year~bed_code, scales = "free_y")+
+  labs(x = "Shell Height (mm)", y = "Density") -> x
+
+ggsave("./figures/fishery_independent/2020/kne1-3_dredge_survey_size_comp.png", plot = x,
+       width = 12, height = 4, units = "in")
+
+#### KNE 4-6
+shad %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(bed_code %in% c("KNE4", "KNE5", "KNE6")) %>%
+  ggplot()+
+  geom_histogram(aes(x = size, y = ..density.., weight = sample_factor),
+                 binwidth = 3, color = "black", fill = cb_palette[3])+
+  geom_vline(xintercept = 100, linetype = 2)+
+  facet_grid(year~bed_code, scales = "free_y")+
+  labs(x = "Shell Height (mm)", y = "Density") -> x
+
+ggsave("./figures/fishery_independent/2020/kne4-6_dredge_survey_size_comp.png", plot = x,
+       width = 12, height = 4, units = "in")
 
 # meat weight ~ shell height ----
 
@@ -313,6 +647,50 @@ ggsave("./figures/fishery_independent/2020/2019_2020_statewide_scallop_survey_mw
       height = 5, width = 8, units = "in")
 
 
+### mw ~ shell height by bed
+#### KSH1
+shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(bed_code == "KSH1",
+         !is.na(meat_wt), 
+         !is.na(size)) %>%
+  ggplot()+
+  geom_jitter(aes(x = size, y = meat_wt, color = factor(year)), alpha = 0.5)+
+  geom_smooth(aes(x = size, y = meat_wt, color = factor(year)), method = "gam", se = F)+
+  scale_color_manual(values = cb_palette[c(2:4, 8)])+
+  labs(x = "Shell Height (mm)", y = "Meat Weight (g)", color = NULL)+
+  theme(legend.position = c(0, 1),
+        legend.justification = c(0, 1)) -> x
+
+
+ggsave("./figures/fishery_independent/2020/ksh1_mw_sh.png", plot = x, 
+       height = 4, width = 6, units = "in")
+
+
+#### KNE
+shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(grepl("KNE", bed_code),
+         !is.na(meat_wt), 
+         !is.na(size)) %>%
+  ggplot()+
+  geom_jitter(aes(x = size, y = meat_wt, color = factor(year), shape = bed_code), alpha = 0.5)+
+  geom_smooth(aes(x = size, y = meat_wt, color = factor(year)), method = "gam", se = F)+
+  scale_color_manual(values = cb_palette[c(3, 8)])+
+  labs(x = "Shell Height (mm)", y = "Meat Weight (g)", color = NULL, shape = NULL)+
+  theme(legend.position = c(0, 1),
+        legend.justification = c(0, 1)) -> x
+
+ggsave("./figures/fishery_independent/2020/kne_mw_sh.png", plot = x, 
+       height = 4, width = 6, units = "in")
+
+
 # meat weight ~ round weight ----
 shaw %>%
   filter(!is.na(meat_wt)) %>%
@@ -340,6 +718,48 @@ ggsave("./figures/fishery_independent/2020/2019_2020_dredge_survey_rwt_mwt.png",
 ggsave("./figures/fishery_independent/2020/2020_dredge_survey_rwt_mwt.png", plot = p2,
        width = 6, height = 4, units = "in")
 
+
+### mw ~ rnd weight by bed
+#### KSH1
+shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(bed_code == "KSH1",
+         !is.na(meat_wt)) %>%
+  ggplot()+
+  geom_jitter(aes(x = whole_wt, y = meat_wt, color = factor(year)), alpha = 0.5)+
+  geom_smooth(aes(x = whole_wt, y = meat_wt, color = factor(year)), method = "gam", se = F)+
+  geom_line(aes(x = whole_wt, y = whole_wt * 0.1), linetype = 2, size = 1)+
+  scale_color_manual(values = cb_palette[c(2:4, 8)])+
+  labs(x = "Round Weight(g)", y = "Meat Weight (g)", color = NULL)+
+  theme(legend.position = c(0, 1),
+        legend.justification = c(0, 1)) -> x
+
+ggsave("./figures/fishery_independent/2020/ksh1_mw_rw.png", plot = x, 
+       height = 4, width = 6, units = "in")
+
+#### KNE
+shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  filter(grepl("KNE", bed_code),
+         !is.na(meat_wt)) %>%
+  ggplot()+
+  geom_jitter(aes(x = whole_wt, y = meat_wt, color = factor(year), shape = bed_code), alpha = 0.5)+
+  geom_smooth(aes(x = whole_wt, y = meat_wt, color = factor(year)), method = "gam", se = F)+
+  geom_line(aes(x = whole_wt, y = whole_wt * 0.1), linetype = 2, size = 1)+
+  scale_color_manual(values = cb_palette[c(3, 8)])+
+  labs(x = "Round Weight(g)", y = "Meat Weight (g)", color = NULL, shape = NULL)+
+  theme(legend.position = c(0, 1),
+        legend.justification = c(0, 1)) -> x
+
+ggsave("./figures/fishery_independent/2020/kne_mw_rw.png", plot = x, 
+       height = 4, width = 6, units = "in")
+
 # pathologies and sex ratio ----
 
 # extract prop estimate and p-value
@@ -350,6 +770,10 @@ f_p_prop <- function(x) {
 }
 
 shaw %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
   filter(samp_grp == 1) %>%
   mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   group_by(year, bed_code) %>%
@@ -366,7 +790,12 @@ shaw %>%
 
 ## weak meats
 shaw %>% 
-  mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  
+  rename(bed_code = bed_code.y) %>%
+  #mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   group_by(year, bed_code, samp_grp) %>%
   summarise(n_shucked = n(),
             wk_mts = sum(meat_condition) / n() * 100) -> weak_meat
@@ -405,12 +834,24 @@ left_join(weak_meat, mud_blister, by = c("year", "bed_code", "samp_grp")) %>%
   arrange(samp_grp, bed_code) %T>%
   write_csv("./output/fishery_independent/statewide_scallop_survey/2020/pathologies_by_bed.csv")
 
-
-
+# kne weak meat plot
+weak_meat %>%
+  filter(grepl("KNE", bed_code),
+         samp_grp == 1) %>%
+  ggplot()+
+  geom_bar(aes(x = bed_code, y = wk_mts), stat = "identity")+
+  facet_wrap(~year, nrow = 2)+
+  labs(x = NULL, y = "Percent Weak Meats") -> x
+ggsave("./figures/fishery_independent/2020/kns_weak_meats.png", plot = x, 
+       height = 5, width = 3, units = "in")  
 
 # gonad condition ----
 shaw %>% 
-  mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  #mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   filter(!is.na(gonad),
          samp_grp == 1) %>%
   group_by(year, bed_code) %>%
@@ -428,6 +869,41 @@ shaw %>%
   rename_at(4:9, ~tolower(c("immature", "empty", "initial_recovery", "filling", "full", "cannot_determine"))) %>%
   # write output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2020/2019_2020_gonad_condition.csv")
+
+# gonad size comp
+shaw %>% 
+  left_join(logbook %>%
+              dplyr::select(tow, bed_code),
+            by = "tow") %>%
+  rename(bed_code = bed_code.y) %>%
+  #mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
+  filter(!is.na(gonad),
+         !is.na(size)) %>%
+  dplyr::select(year, bed_code, gonad, size) %>%
+  # 10 mm size bin
+  mutate(size_bin = round(size / 10, 0) * 10) %>%
+  count(bed_code, year, size_bin, gonad) %>%
+  group_by(bed_code, year, size_bin) %>%
+  mutate(prop = n / sum(n))  %>%
+  ungroup() %>%
+  mutate(gonad = case_when(gonad == 0 ~ "immature", 
+                           gonad == 1 ~ "empty",
+                           gonad == 2 ~ "initial recovery",
+                           gonad == 3 ~ "filling",
+                           gonad == 4 ~ "full",
+                           gonad == 5 ~ "cannot determine"),
+         gonad = factor(gonad, levels = c("immature", "empty", "initial recovery",
+                                          "filling", "full", "cannot determine"))) %>%
+  
+  ggplot()+
+  geom_bar(aes(x = size_bin, y = prop, fill = gonad), position = "stack", stat = "identity")+
+  facet_wrap(year~bed_code, scales = "free")+
+  labs(x = "Size Bin (10 mm)", y = "Proportion", fill = NULL) -> x
+  
+ggsave("./figures/fishery_independent/2020/gonad_at_size.png", plot = x, 
+       height = 10, width = 12, units = "in")
+
+
 
 
 # size at maturity ----
@@ -539,26 +1015,36 @@ ggsave("./figures/fishery_independent/2020/2019_2020_statewide_scallop_survey_ma
 
 
 
-# heat map ----
-f_shp_prep("./data/maps/statewide_scallop_survey_grid_2019", "scalGrid2019_all_albers") %>%
-  f_transform_crs(x = ., to = "+proj=longlat +datum=WGS84 +no_defs") %>%
-  .[[1]] %>%
-  filter(bed_code == "KSH1") -> grid
+
+
+fish_stats %>%
+  filter(year == 2020)
+
+## object from statewide_fishery_performance.R
+exists("fish_stats")
+
+# cpue with fishery data
+read_csv("./output/fishery_independent/statewide_scallop_survey/2020/abundance_rnd_biomass_by_bed.csv") %>%
+  filter(bed_code %in% grep("KSH|KNE", bed_code, value = T),
+         samp_grp == 1) %>%
+  right_join(expand_grid(bed_code = c("KNE1", "KNE2", "KNE3", "KNE4", "KNE5", "KNE6", "KSH1"),
+                         year = 2016:2020)) %>%
+  mutate(district = ifelse(bed_code == "KSH1", "KSH", "KNE")) %>%
   
-
-
-catch %>%
-  filter(bed_code == "KSH1",
-         samp_grp == 1) -> tmp
-
-tibble(lat = rep(tmp$lat, tmp$samp_cnt),
-       lon = rep(tmp$lon, tmp$samp_cnt)) %>%
-  ggplot()+
-  geom_density_2d_filled(aes(x = lon, y = lat), adjust = c(1, 1))+
-  geom_polygon(data = grid, aes(x = long, y = lat, group = group), fill = NA, color = "black")+
-  geom_point(data = filter(catch, bed_code == "KSH1", samp_grp == 1), aes(x = lon, y = lat, size = samp_cnt), color = "pink")
+  # join to fishery cpue
+  left_join(fish_stats %>%
+              dplyr::select(year, district, mt_cpue) %>%
+               filter(year >= 2016)) %>%
   
-
-                         
-
+  ggplot()+ 
+  geom_point(aes(x = factor(year), y = mt_cpue*1000))+
+  geom_line(aes(x = factor(year), y = mt_cpue *1000, group = 1), linetype = 2)+
+  scale_y_continuous(sec.axis = sec_axis(~./1000, name = "Fishery CPUE (mt lb / dredg hr)\n "), labels = comma)+
+  geom_point(aes(x = factor(year), y = cpue_abund, color= bed_code))+
+  geom_line(aes(x = factor(year), y = cpue_abund, group = bed_code, color= bed_code))+
+  scale_color_manual(values = cb_palette[2:8])+
+  labs(x = NULL, y = bquote("Survey CPUE (Scallops /" ~ " "~ nm^-2~ ")"), color = NULL)+
+  facet_wrap(~district, nrow = 2, scales = "free") -> x
+ggsave("./figures/fishery_independent/2020/2020_survey_fishery_cpue.png", plot = x, 
+       height = 6, width = 6, units = "in")
 

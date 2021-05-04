@@ -16,13 +16,13 @@ library(tidyverse)
 ### drop - logical, drop unneeded columns, default = T
 f_clean_log <- function(x, drop = T){ 
   x %>%
-    mutate(lat = (start_lat + end_lat) / 2,
-           lon = (start_lon + end_lon) /2,
-           area_swept = distance * 0.00131663) %>%
-    filter(haul_type == 10) -> tmp
+    mutate(lat = (lat_start + lat_end) / 2,
+           lon = (lon_start + lon_end) /2,
+           area_swept = distance_nm * 0.00131663) %>%
+    filter(haul_type %in% c("10", "Standard")) -> tmp
   if(drop == T){
     tmp %>%
-      dplyr::select(year, cruise, tow, haul, gear_perf, bed_code, lat, lon, avg_depth, area_swept)
+      dplyr::select(cruise_year, cruise, tow, haul, gear_perf, bed_code, lat, lon, avg_depth, area_swept)
   } else{tmp}
 }
 
@@ -31,6 +31,10 @@ f_clean_log <- function(x, drop = T){
 ### x - raw catch data (2019 - present format)
 ### y - cleaned logbook data (see f_clean_log)
 f_catch_by_tow <- function(x, y){
+  # remove clappers and empty shells
+  x %>%
+    filter(!(comname %in% c("Empty shells", "Clapper", "Clappers", "Empty_Shells, Scallop", "Empty Scallop Shells"))) %>%
+    mutate(comname = ifelse(grepl("eathervane", comname), "weathervane scallop", comname)) -> x
   
   # temporarily given small scallops a different rcode for ease of data summary
   x %>%

@@ -5,9 +5,13 @@
 ## last updated: 2020/2/27
 
 # load libraries ----
+library(here)
+library(lubridate)
+library(scales)
 library(tidyverse)
 library(mgcv)
 library(mgcViz)
+library(spatstat)
 
 # functions ----
 
@@ -29,10 +33,10 @@ f_catch_rename <- function(x){
 # args:
 ## x - daily bycatch data (as downloaded directly from wiki)
 f_bycatch_rename <- function(x){
-  names(x) <- c("Fishery", "ADFG", "Set_date", "District", "hauls", "dredge_hrs", 
+  names(x) <- c("Fishery", "District", "ADFG", "haul", "gear_perf", "Set_date", "bed_code", "dredge_hrs", 
                     "est_rnd_wt", "mt_wt", "sample_hrs", "bairdi_count", "opilio_count",
-                    "dungeness_count", "halibut_count", "disc_count", "disc_wt", "broken_wt",
-                    "rem_disc_wt", "clapper_count", "king_count")
+                    "dungeness_count", "king_count", "halibut_count", "disc_count", "disc_wt", "broken_wt",
+                    "rem_disc_wt", "clapper_count")
   x
 }
 
@@ -73,17 +77,18 @@ f_add_season <- function(x, fishery_col = "Fishery"){
 # revise district to align with current mgmt structure
 # args: x - any tibble containing the field 'district' or 'District'
 f_revise_district <- function(x){
+  
   if(!("district" %in% names(x))){
     x %>%
       mutate(District = ifelse(bed_code %in% c("KSH5", "KSH6", "KSH7"), "KSW", District),
-             District = ifelse(District == "KSH" & set_lat < 57.7 & set_lon <= -154,
+             District = ifelse(District == "KSH" & set_lat < 57.7 & set_lon <= -154.35,
                                "KSW", District),
              District = ifelse(District %in% c("D16", "D", "YAK"),
                                "YAK", District))
   } else{
     x %>%
       mutate(district = ifelse(bed_code %in% c("KSH5", "KSH6", "KSH7"), "KSW", district),
-             district = ifelse(district == "KSH" & set_lat < 57.7 & set_lon <= -154,
+             district = ifelse(district == "KSH" & set_lat < 57.7 & set_lon <= -154.35,
                                "KSW", district),
              district = ifelse(district %in% c("D16", "D", "YAK"),
                                "YAK", district))
@@ -120,7 +125,9 @@ f_fish_stats <- function(x, district, add_ghl = F, path){
       filter(District %in% district) %>%
       group_by(Season) %>%
       summarise(ghl = sum(ghl, na.rm = T)) %>%
-      right_join(tmp, by = "Season") -> tmp
+      left_join(., tmp, by = "Season") %>%
+      replace_na(list(mt_wt = 0, rnd_wt = 0, dredge_hrs = 0, number_hauls = 0)) %>%
+      filter(as.numeric(substring(Season, 1, 4)) > 2008) -> tmp
     }
   }
   # write to a csv if necessary
@@ -213,7 +220,7 @@ f_standardize_cpue <- function(x, path, by){
   adj <- mean(y$rw_cpue, na.rm = T)
   # fit model
   mod <- bam(rw_cpue + adj ~ s(depth, k = 4, by = Bed) + s(set_lon, by = Bed) + 
-              Month + Vessel + Season * Bed, data = y, gamma = 1.4, 
+              Month + Vessel + Bed + Season, data = y, gamma = 1.4, 
               family = Gamma(link = log), select = T)
   # print diagnostics
   mod_viz <- getViz(mod)
@@ -257,14 +264,17 @@ f_standardize_cpue <- function(x, path, by){
                   mutate(w = n / sum(n, na.rm = T)),
                 by = c("Season", "Bed", "Month", "Vessel")) %>% 
       replace_na(list(n = 0, w = 0)) %>%
-      # add fitted values from models
-      mutate(fit = predict(mod, newdata = ., type = "response") - adj) %>%
+      bind_cols(tibble(fit = predict(mod, newdata = ., type = "response"), 
+                       cv_fit = predict(mod, newdata = ., type = "response", se.fit = T)$se.fit / fit)) %>%
+      mutate(fit = fit - adj,
+             se_fit = cv_fit * fit) %>%
       group_by(Season) %>%
       # remove if sum of weights for season/bed is zero
       mutate(sum_w = sum(w)) %>%
       filter(sum_w > 0) %>%
       # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
-      summarise(std_cpue = spatstat::weighted.median(fit, w = w)) %>%
+      summarise(std_cpue = weighted.median(fit, w = w),
+                std_cpue_se = sum(se_fit * w)) %>%
       # correct season
       mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
                              as.numeric(as.character(Season)) + 2000,
@@ -277,7 +287,7 @@ f_standardize_cpue <- function(x, path, by){
                             nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
                             nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)),
                 by = "Season") %>%
-      dplyr::select(Season, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue) %>%
+      dplyr::select(Season, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue, std_cpue_se) %>%
       as_tibble(.)
   } else{if(by == "Bed"){
     tmp %>%
@@ -295,7 +305,7 @@ f_standardize_cpue <- function(x, path, by){
       mutate(sum_w = sum(w)) %>%
       filter(sum_w > 0) %>%
       # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
-      summarise(std_cpue = spatstat::weighted.median(fit, w = w)) %>%
+      summarise(std_cpue = weighted.median(fit, w = w)) %>%
       ungroup() %>%
       # correct season
       mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
@@ -376,7 +386,7 @@ f_standardize_cpue2 <- function(x, path){
       mutate(fit = predict(mod, newdata = ., type = "response") - adj) %>%
       # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
       group_by(Season) %>%
-      summarise(std_cpue = spatstat::weighted.median(fit, w = w)) %>%
+      summarise(std_cpue = weighted.median(fit, w = w)) %>%
       # correct season
       mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
                              as.numeric(as.character(Season)) + 2000,

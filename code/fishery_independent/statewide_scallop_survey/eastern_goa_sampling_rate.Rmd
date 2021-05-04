@@ -1,0 +1,159 @@
+---
+title: "Eastern GOA Scallop Beds Sampling Rate"
+author: "Tyler Jackson"
+date: "2/22/2021"
+output:
+  bookdown::pdf_document2:
+    toc: no
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(xtable)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+```
+
+
+```{r echo = F, include = T, warning = F, message = F}
+source("../../../code/misc/statewide_scallop_survey_functions.R")
+
+### beds
+beds <- c("WK1", "EK1", "YAKB", "YAK1", "YAK2", "YAK3", "YAK4", "YAK5")
+
+# data ----
+
+## logbook data
+read.csv("../../../data/statewide_scallop_survey/logbook/survey_log_ts_temporary.csv") %>%
+  rename(year = cruise_year,
+         start_lat = lat_start,
+         start_lon = lon_start,
+         end_lat = lat_end,
+         end_lon = lon_end,
+         distance = distance_nm,
+         gear_perf = perform,
+         bed_code = bed_name,
+         avg_depth = depth_avg) -> logbook
+
+## catch data
+read.csv("../../../data/statewide_scallop_survey/catch/survey_catch_ts_temporary.csv") %>%
+  rename(year = cruise_year,
+         bed_code = bed_name) -> catch_raw
+
+## specimen data
+read.csv("../../../data/statewide_scallop_survey/specimen/survey_specimen_ts_temporary.csv") %>%
+  #mutate(damage = as.character(damage)) %>%
+  #bind_rows(read_csv("./data/statewide_scallop_survey/specimen/Cruise1901_2001_ScallopShellHeightAndWeightData.csv")) %>%
+  rename(year = cruise_year,
+         size = shell_height,
+         bed_code = bed_name)  -> specimen
+
+## bed strata data
+strata <- read_csv("../../../data/statewide_scallop_survey/bed_strata.csv")
+
+# data mgmt ----
+
+## tows
+tows <- f_clean_log(logbook) 
+catch <- f_catch_by_tow(catch_raw, tows)
+shaw <- f_get_shaw(specimen)
+shad <- f_get_shad(specimen, catch)
+
+## remove tow 54 from 2019 (towed twice) and change name of bed (YAKB -> EK1)
+filter(tows, tow != 19010054) -> tows
+filter(catch, tow != 19010054) -> catch
+filter(shaw, tow != 19010054) -> shaw
+filter(shad, tow != 19010054) -> shad
+
+## edit strata so that YAKB gets the code EK1 for consistency
+strata %>%
+  # filter for only active stations
+  filter(status == "active") %>%
+  # compute bed area
+  group_by(bed_code) %>%
+  summarise(area_nm2 = sum(area_nmi2_alb),
+            n_stations = n()) %>%
+  # filter for beds surveyed
+  filter(bed_code %in% beds) -> bed_area
+
+
+# compute baseline estimates at 30% sample rate ----
+
+## get cpue, abundance, and cv for current sampling rate 30%
+catch %>%
+  ungroup() %>%
+  filter(rcode == 74120,
+         samp_grp == 1,
+         bed_code %in% beds) %>%
+  # separate YAKB and EK1
+  mutate(bed_code = ifelse(bed_code == "EK1" & year %in% c(2017, 2019), "YAKB", bed_code)) %>%
+  dplyr::select(year, tow, bed_code, area_swept, samp_cnt, cpue_cnt) %>%
+  left_join(bed_area, by = "bed_code") %>%
+  group_by(year, bed_code) %>%
+  summarise(cpue = mean(cpue_cnt),
+            abundance = cpue * mean(area_nm2),
+            cv = sqrt(var(cpue_cnt) / n()) / cpue) -> baseline
+
+
+```
+
+# Purpose
+This analysis briefly explores the effects of sampling rate reduction for ADF\&G scallop dredge surveys on beds in Prince William Sound and Yakutat registration areas.
+
+# Method
+Baseline survey estimates were obtained using a systematic design that samples every third station (approx. 33\% sampling rate) (see ROP for more details). The effect of sampling rate reduction was evaluated by bootstrap resampling survey data at 25\% and 20\% sampling rates. For example, during the 2019 survey 40 stations where sampled within the YAK4 bed (124 total stations). Bootstrap sample sizes at a 25\% sampling rate would be 31 stations, and at 20\% the sample size would be 25 stations. Large ($\geq$ 100 mm) scallop abundance was estimated following each bootstrap iteration (1,000 iterations total) and the estimated null distribution of abundance and associated coefficient of variation ($CV_{boot}$) were compared among sampling rates. Separate simulations were performed for combinations of year and bed to avoid year effects in bootstrap samples.
+
+# Results and Recommendation
+Estimation of abundance appears to be fairly robust to small reductions in sampling rate, in part because some beds (e.g., YAK3, YAK4) are large enough so that large sample sizes are still obtained at lower rates. Still, At a 25\% sampling rate, $CV_{boot}$ differed by less that 5\% (0.05) in most year/bed combinations. Overall uncertainty in abundance remained within an acceptable range in most Yakutat beds ($CV_{boot}$ = 0.13 - 0.29). At a sampling rate of 20\%, several beds saw larger jumps in uncertainty relative to the scale of abundance, namely WK1 and YAK5. Since this is a somewhat crude analysis, it may be prudent to consider these results the 'best case scenario' for now. I would recommend not reducing the sampling rate to 20\% for the effect it may have on estimates of smaller beds (e.g., WK1, EK1, YAKB, YAK5). While slightly higher levels of uncertainty are acceptable in exchange for broader spatial coverage, estimates with CVs at or near 0.4 (i.e., the standard error is 40\% of the estimate) become less informative in the context of modelling population dynamics, some caution should be exercised when reducing sampling rates on small beds.
+
+````{r abund, out.width = '100%', fig.align='center', fig.cap="Null distributions of survey abundance by year and bed, estimated via bootstrapping. Dotted lines represent observed abundance.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/sampling_rate_egoa.png")
+```
+
+\begin{table}[H]
+\centering
+\caption{$CV_{boot}$ by survey year and bed based on three different sampling rates.}
+
+\label{table:cvtable}
+\begin{tabular}{llcccc}
+& & \multicolumn{3}{c}{Sampling Rate} \\
+Year & Bed & 33\% & 25\% & 20\% \\ 
+\hline
+```{r cvtable, results = 'asis', eval = T}
+## differences in cv
+readRDS("../../../output/fishery_independent/survey_design/egoa_sample_rate.RDS") %>%
+  unnest(boot, sim1, sim2) %>%
+  ungroup() %>%
+  dplyr::select(year, bed_code, abundance, abundance1, abundance2) %>%
+  pivot_longer(c(abundance, abundance1, abundance2), names_to = "rate", values_to = "abundance_sim") %>%
+  mutate(rate = case_when(rate == "abundance" ~ "33%",
+                          rate == "abundance1" ~ "25%",
+                          rate == "abundance2" ~ "20%"),
+         rate = factor(rate, levels = c("33%", "25%", "20%"))) %>%
+  left_join(baseline %>%
+              dplyr::select(year, bed_code, abundance),
+            by = c("year", "bed_code")) %>%
+  group_by(year, bed_code, rate) %>%
+  summarise(cv = sqrt(var(abundance_sim)) / mean(abundance_sim)) %>%
+  pivot_wider(names_from = rate, values_from = cv) -> tmp
+
+print(xtable(tmp, align = "llcccc", digits = 2), 
+      only.contents = TRUE, 
+      include.rownames = FALSE, 
+      floating = FALSE, 
+      include.colnames = FALSE, 
+      hline.after = NULL)
+
+```
+\hline	
+\end{tabular} 
+\end{table}
+
+
+
+
+

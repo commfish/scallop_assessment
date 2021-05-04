@@ -12,6 +12,7 @@
 
 # load ----
 library(sp)
+library(spdplyr)
 library(RANN)
 library(rgdal) # requires sp, will use proj.4 if installed
 library(maptools)
@@ -121,13 +122,45 @@ f_make_grid <- function(lat, long, by, join, values){
 ###         the output is x, with an added column denoted which polygon the point overlays
 f_over <- function(x, y, coords = c("lon", "lat"), label){
   x %>%
-    dplyr::select("lon", "lat") %>%
+    dplyr::select(coords) %>%
     SpatialPoints(., proj4string = CRS(proj4string(y))) %>%
     sp::over(., y, fn = NULL) %>%
     as_tibble() -> tmp 
   if(!missing(label)){pull(tmp, label)}
 }
 
+## wrapper of pipeline for coercing boundary points of a polygon to spatial polygon data frame
+## args:
+### x - data frame of spatial points 
+### poly_name - optional. Names of polygons in order presented in 'x'. Only used if add_name = T. Useful when coercing multiple polygons in vectorized function.
+### add_name - optional. Add polygon name to sp data frame. default = T
+### coords - coords - names of columns for spatial coordinates. Defaults are "lon" and "lat"
+
+f_make_sp_polygon_df <- function(x, poly_name, add_name = T, coords = c("lon", "lat")) {
+  
+  if(add_name == F) {
+    x %>%
+      dplyr::select(coords) %>%
+      coordinates(.) %>%
+      Polygon(.) %>%
+      list(.) %>%
+      Polygons(., 1) %>%
+      list(.) %>%
+      SpatialPolygons(.) %>%
+      SpatialPolygonsDataFrame(., data = data.frame(value = 999))
+  }
+  if(add_name == T) {
+    x %>%
+      dplyr::select(coords) %>%
+      coordinates(.) %>%
+      Polygon(.) %>%
+      list(.) %>%
+      Polygons(., 1) %>%
+      list(.) %>%
+      SpatialPolygons(.) %>%
+      SpatialPolygonsDataFrame(., data = data.frame(poly_name = poly_name))
+  }
+}
 
 # base map ----
 ## base map
