@@ -14,10 +14,17 @@ source("./code./misc/adfg_map_functions.R")
 f_shp_prep("./data/maps/mgmt_units", "Scallop_Statewide_Areas_PY", fortify = F) %>%
   spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> reg_areas
 
-# ## district polygons (currently only area K and M) for classifying district in survey tows
-f_shp_prep("./data/maps/mgmt_units", "Scallop_KM_Districts_wgs84", fortify = F) %>%
+## district polygons (currently only area K and M) for classifying district in survey tows
+f_shp_prep("./data/maps/mgmt_units", "Scallop_KM_Districts_wgs84_ksh_ksw_new_bdry", fortify = F) %>%
   spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> district_polygons
 
+## bed polygons
+f_shp_prep("./data/maps/bed_bounding_boxes", "bed_bounding_box", fortify = F) %>%
+  spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> bed_boxes
+
+## area K and M closure area polygons
+f_shp_prep("./data/maps/scallop_closed_waters", "Scallop_KM_Closures_2020", fortify = F) %>%
+  spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> closures
 
 # ## load raw catch and specimen dump from standard survey stations 1988 - present
 ## data contacts: Kally Spallinger, Ric Shepard, Mike Knutsen (ADF&G Kodiak)
@@ -42,11 +49,11 @@ catch %>%
   mutate(Haul_Date = lubridate::mdy(Haul_Date),
          year = lubridate::year(Haul_Date)) %>%
   # select fields we are interested in 
-  select(year, Survey, Tow, Haul_Date, Station, Start_Lat, Start_Lon, End_Lat, End_Lon,
+  select(year, Survey, Tow, Haul_Date, Station, Waters, Start_Lat, Start_Lon, End_Lat, End_Lon,
          `Depth_Avg(fm)`, `Bottom_Temp(c)`, `Distance(km)`, RACE_code, Measured_cnt,
          `Measured_wt(kg)`, Unmeasured_cnt, `Unmeasured_wt(kg)`, Final_cnt, `Final_wt(kg)`) %>%
   # rename fields
-  rename(Year = year, tow = Tow, haul_date = Haul_Date, start_lat = Start_Lat, 
+  rename(Year = year, waters = Waters, tow = Tow, haul_date = Haul_Date, start_lat = Start_Lat, 
          start_lon = Start_Lon, end_lat = End_Lat, end_lon = End_Lon, depth_fa = `Depth_Avg(fm)`,
          bottom_temp = `Bottom_Temp(c)`, distance_km = `Distance(km)`, 
          measured_count = Measured_cnt, measured_wt_kg = `Measured_wt(kg)`, 
@@ -60,7 +67,7 @@ catch %>%
   
 ### get a list of all tows
 tmp %>%
-  dplyr::select(Year, Survey, tow, haul_date, Station, depth_fa, bottom_temp, distance_km, lon, lat) %>%
+  dplyr::select(Year, Survey, tow, haul_date, Station, waters, depth_fa, bottom_temp, distance_km, lon, lat) %>%
   # remove all duplicates
   distinct() %>%
   # join to scallop catch tows
@@ -86,7 +93,11 @@ tmp %>%
          reg_area = case_when(reg_area == "Kodiak" ~ "K",
                               reg_area == "Alaska Peninsula" ~ "M",
                               reg_area == "Dutch Harbor" ~ "O"),
-         reg_area = factor(reg_area)) -> wslm_catch
+         reg_area = factor(reg_area),
+         bed_code = f_over(x = ., y = bed_boxes, label = "poly_name"),
+         bed_code = factor(bed_code),
+         closure_area = f_over(x = ., y = closures, label = "Place_Name"),
+         closure_area = factor(closure_area)) -> wslm_catch
 
 print("Westward Region standard large mesh survey scallop catch data has been loaded -> wslm_catch")  
 
@@ -124,7 +135,16 @@ spec %>%
          reg_area = case_when(reg_area == "Kodiak" ~ "K",
                               reg_area == "Alaska Peninsula" ~ "M",
                               reg_area == "Dutch Harbor" ~ "O"),
-         reg_area = factor(reg_area)) -> wslm_specimen
+         reg_area = factor(reg_area),
+         bed_code = f_over(x = ., y = bed_boxes, label = "poly_name"),
+         bed_code = factor(bed_code),
+         closure_area = f_over(x = ., y = closures, label = "Place_Name"),
+         closure_area = factor(closure_area)) %>%
+  # add the waters strata
+  left_join(wslm_catch %>%
+              count(Station, waters) %>%
+              dplyr::select(-n),
+            by = "Station") -> wslm_specimen
 
 print("Westward Region standard large mesh survey scallop specimen data has been loaded -> wslm_specimen")  
 
