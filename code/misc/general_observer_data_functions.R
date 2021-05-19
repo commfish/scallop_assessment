@@ -204,9 +204,10 @@ f_extent_catch <- function(x, quant = 0.9){
 ### 'Season', 'Bed', 'Vessel', 'Month', 'depth', 'set_lon'.
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, Bed, and Vessel
 ### by - level to summarise standardized coue over. "Season" or "Bed"
+### compute_predicted - T/F comput predicted value of CPUE based on season and all other inputs on average
 ### Outputs a point estimate for each season and effects plots of Season, Bed, 
 ### Vessel, and Month
-f_standardize_cpue <- function(x, path, by){
+f_standardize_cpue <- function(x, path, by, compute_predicted){
   
   x %>%
     # filter for only satisfacory dredges
@@ -217,9 +218,15 @@ f_standardize_cpue <- function(x, path, by){
            Season = factor(substring(Season, 3, 4))) -> y
 
   # create cpue modifer
-  adj <- mean(y$rw_cpue, na.rm = T)
+  adj <- mean(y$rw_cpue)
+  
+  # set reference levels
+  y$Bed = relevel(y$Bed, mode(y$Bed))
+  y$Month = relevel(y$Month, mode(y$Month))
+  y$Vessel = relevel(y$Vessel, mode(y$Vessel))
+  
   # fit model
-  mod <- bam(rw_cpue + adj ~ s(depth, k = 4, by = Bed) + s(set_lon, by = Bed) + 
+  mod <- bam((rw_cpue + adj) ~ s(depth, k = 4, by = Bed) + s(set_lon, by = Bed) + 
               Month + Vessel + Bed + Season, data = y, gamma = 1.4, 
               family = Gamma(link = log), select = T)
   # print diagnostics
@@ -243,6 +250,18 @@ f_standardize_cpue <- function(x, path, by){
                       theme(axis.text = element_text(size = 9)), pages = 1), 
         height = 4, width = 7, units = "in")
   }
+  
+  # extract year effect
+  tibble(par = names(mod$coefficients), 
+         est = mod$coefficients,
+         se = sqrt(diag(vcov(mod)))) %>%
+    filter(grepl("Intercept|Season", names(mod$coefficients))) %>%
+    mutate(std_cpue = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
+           std_cpue = exp(std_cpue + se/2) - adj,
+           Season = unique(x$Season)) %>%
+    dplyr::select(Season, std_cpue) -> out 
+    
+  if(compute_predicted == T){
   # compute standardized cpue
   expand_grid(Season = unique(y$Season), 
               Month = unique(y$Month),
@@ -321,9 +340,13 @@ f_standardize_cpue <- function(x, path, by){
                 by = c("Season", "Bed")) %>%
       
       dplyr::select(Season, Bed, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue) %>%
-      as_tibble(.)
+      as_tibble(.) -> out
+  }
     }
   }
+  
+  return(out)
+  
 }
 
 
@@ -333,7 +356,7 @@ f_standardize_cpue <- function(x, path, by){
 ### 'Season', Vessel', 'Month', 'depth', 'set_lon'.
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, and Vessel
 ### Outputs a point estimate for each season and effects plots of Season, Vessel, and Month
-f_standardize_cpue2 <- function(x, path){
+f_standardize_cpue2 <- function(x, path, compute_predicted = T){
   
   x %>%
     # filter for only satisfacory dredges
@@ -345,6 +368,12 @@ f_standardize_cpue2 <- function(x, path){
   
   # create cpue modifer
   adj <- mean(y$rw_cpue, na.rm = T)
+  
+  
+  # set reference levels
+  y$Month = relevel(y$Month, mode(y$Month))
+  y$Vessel = relevel(y$Vessel, mode(y$Vessel))
+  
   # fit model
   mod <- bam(rw_cpue + adj ~ s(depth, k = 4) + s(set_lon) + 
                Month + Vessel + Season, data = y, gamma = 1.4, 
@@ -369,6 +398,18 @@ f_standardize_cpue2 <- function(x, path){
                           theme_sleek(), pages = 1), 
            height = 4, width = 6, units = "in")
   }
+  
+  # extract year effect
+  tibble(par = names(mod$coefficients), 
+         est = mod$coefficients,
+         se = sqrt(diag(vcov(mod)))) %>%
+    filter(grepl("Intercept|Season", names(mod$coefficients))) %>%
+    mutate(std_cpue = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
+           std_cpue = exp(std_cpue + se/2) - adj,
+           Season = unique(x$Season)) %>%
+    dplyr::select(Season, std_cpue) -> out 
+  
+  if(compute_predicted == T){
   # compute standardized cpue
   expand_grid(Season = unique(y$Season), 
               Month = unique(y$Month),
@@ -400,8 +441,36 @@ f_standardize_cpue2 <- function(x, path){
                             nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)),
                 by = "Season") %>%
       dplyr::select(Season, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue) %>%
-      as_tibble(.)
+      as_tibble(.)}
+  
+  return(out)
 }  
+
+
+## estimate discards two different ways to account for observer data collection error in YAK and KSH in 2018
+### args:
+### nh - dummy variable representing day when observer made mistake
+### data - discard/bycatch report by day
+f_disc_nh <- function(nh, data){
+  if(nh == F){
+    data %>%
+      summarise(effort = sum(dredge_hrs),
+                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt) / sum(sample_hrs),
+                discard_lb = discard_rate_lb * effort,
+                disc_per_lb = sum(disc_count) / sum(disc_wt, broken_wt),
+                discard_rate_num = (sum(disc_count) + disc_per_lb * sum(rem_disc_wt)) / sum(sample_hrs),
+                discard_num = discard_rate_num * effort)
+  } else{
+    data %>%
+      summarise(effort = sum(dredge_hrs),
+                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt) / sum(sample_hrs),
+                discard_lb = discard_rate_lb * effort,
+                disc_per_lb = sum(disc_count) / sum(disc_wt),
+                discard_rate_num = (sum(disc_count) + disc_per_lb * sum(rem_disc_wt)) / sum(sample_hrs),
+                discard_num = discard_rate_num * effort)
+  }
+}
+
 
 
 # objects ----
