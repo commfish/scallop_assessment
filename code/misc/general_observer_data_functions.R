@@ -471,7 +471,100 @@ f_disc_nh <- function(nh, data){
   }
 }
 
-
+## compile observer shell height composition
+### args:
+### sh_data - dataframe of cleaned shell height data
+### catch_data - dataframe of cleaned catch data
+### bycatch_data - dataframe of cleaned bycatch data
+### sh_bin - shell height bin size in mm, if not bins, do not include
+f_observer_sh_comp <- function(sh_data, catch_data, bycatch_data, sh_bin = NULL){
+  
+  
+  
+  ## get number of length samples of retained catch by district
+  data %>%
+    filter(Rtnd_disc == "R") %>%
+    mutate(yr = as.numeric(substring(Season, 1, 4))) %>%
+    rename(district = District) %>%
+    group_by(yr, district) %>%
+    summarise(Nsamp = n(), .groups = "drop") -> sh_nsamp
+  
+  ## expand shell height composition for retained catch
+  shell_height %>%
+    filter(Rtnd_disc == "R") %>%
+    mutate(yr = as.numeric(substring(Season, 1, 4))) %>%
+    # consolidate by sh within haul
+    group_by(yr, District, Haul_ID, sh) %>%
+    count(name = "count") %>%
+    # join to retained catch
+    left_join(catch %>%
+                dplyr::select(Haul_ID, round_weight)) %>%
+    # expand wt
+    mutate(w = count * round_weight) %>%
+    # summarise by district
+    group_by(yr, District, sh) %>%
+    summarise(w = sum(w, na.rm = T)) %>%
+    # add sum of w by district, convert w to prop
+    group_by(yr, District) %>%
+    mutate(sum_w = sum(w, na.rm = T),
+           w_prop = w / sum_w) %>%
+    rename_all(tolower) %>%
+    # join to nsamp
+    left_join(sh_nsamp) %>%
+    dplyr::select(yr, district, Nsamp, sh, w_prop) -> fishery_sh
+  
+  ## expand to bycatch
+  bycatch %>%
+    # compute a daily discard rate (lbs/dregde hr)
+    group_by(Season, District, Set_date) %>%
+    summarise(disc_wt = sum(disc_wt, broken_wt, rem_disc_wt),
+              sample = sum(sample_hrs)) %>%
+    group_by(Season, District) %>%
+    mutate(disc_rate = ifelse(sample != 0,
+                              disc_wt / sample,
+                              sum(disc_wt) / sum(sample))) %>%
+    # join to catch data by haul
+    dplyr::select(Season, District, Set_date, disc_rate) %>%
+    right_join(catch, by = c("Season", "District", "Set_date")) %>%
+    # estimate discards by haul
+    mutate(disc_est_lbs = dredge_hrs * disc_rate) %>%
+    # estimate weights for shell height histogram (prop of annual catch)
+    dplyr::select(Season, District, Haul_ID, round_weight, disc_est_lbs) %>%
+    pivot_longer(c(round_weight, disc_est_lbs),
+                 names_to = "Rtnd_disc", values_to = "wt_lbs") %>%
+    mutate(Rtnd_disc = ifelse(Rtnd_disc == "round_weight", "R", "D"),
+           w = wt_lbs / sum(wt_lbs, na.rm = T)) %>%
+    ungroup() %>%
+    dplyr::select(Haul_ID, Rtnd_disc, w) %>%
+    right_join(shell_height, by = c("Haul_ID", "Rtnd_disc")) %>%
+    group_by(Season, District, sh) %>%
+    summarise(w = sum(w)) %>%
+    group_by(Season, District) %>%
+    mutate(w_adj = w / sum(w)) %>%
+    left_join(shell_height %>%
+                group_by(Season, District) %>%
+                summarise(Nsamp = n()),
+              by = c("Season", "District")) %>%
+    mutate(Year = as.numeric(substring(Season, 1, 4))) %>%
+    ungroup() %>%
+    select(Year, District, Nsamp, sh, w_adj) %>%
+    # rename fields for consistency
+    rename(year = Year,
+           district = District,
+           n_measured = Nsamp) -> out
+  
+  # bin and aggregate if appropriate
+  if(!is.null(sh_bin)){
+    out %>%
+      mutate(sh = floor(sh / sh_bin) * sh_bin) %>%
+      group_by(year, district, n_measured, sh) %>%
+      summarise(w_adj = sum(w_adj)) -> out
+  }
+  
+  
+  return(out)
+  
+}
 
 # objects ----
 

@@ -19,10 +19,11 @@ f_clean_log <- function(x, drop = T){
     mutate(lat = (lat_start + lat_end) / 2,
            lon = (lon_start + lon_end) /2,
            area_swept = distance_nm * 0.00131663) %>%
-    filter(haul_type %in% c("10", "Standard")) -> tmp
+    filter(haul_type %in% c("10", "Standard")) %>%
+    rename(year = cruise_year) -> tmp
   if(drop == T){
     tmp %>%
-      dplyr::select(cruise_year, cruise, tow, haul, gear_perf, bed_code, lat, lon, avg_depth, area_swept)
+      dplyr::select(year, cruise, tow, haul, gear_perf, district, bed_code, lat, lon, avg_depth, area_swept)
   } else{tmp}
 }
 
@@ -82,7 +83,7 @@ f_catch_by_tow <- function(x, y){
               by = "rcode") %>%
     dplyr::select(6, 7, 1, 8:13, 14, 2, 17, 5, 3:4, 15:16) %>%
     # change rcode of small scallops back
-    mutate(rcode = ifelse(rcode == (74120 + 9999999), 74120, rcode))
+    mutate(rcode = ifelse(rcode == (74120 + 9999999), 74120, rcode)) 
 }
 
 ## separate SHAW data from all speciemen data
@@ -90,7 +91,7 @@ f_catch_by_tow <- function(x, y){
 ### x - raw specimen data (2019 - present format)
 f_get_shaw <- function(x) {
   x %>%
-    filter(!is.na(sex))
+    filter(!is.na(sex)) 
 } 
 
 ## separate shell height and damage data from all specimen data, compute sample factor
@@ -108,11 +109,11 @@ f_get_shad <- function(x, y){
     mutate(n_measured = sum(count)) %>%
     left_join(y %>%
                 filter(rcode == 74120) %>%
-                dplyr::select(year, cruise, tow, haul, bed_code, lat, lon, avg_depth,
+                dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, avg_depth,
                                area_swept, rcode, samp_grp, samp_cnt),
               by = c("tow", "samp_grp", "year")) %>%
     mutate(sample_factor = samp_cnt * (count / n_measured)) %>%
-    dplyr::select(year, cruise, tow, haul, bed_code, lat, lon, avg_depth, area_swept,
+    dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, avg_depth, area_swept,
                   rcode, samp_grp, size, damage, sample_factor)
 }
 
@@ -127,5 +128,39 @@ boot_ci <- function(split, strata){
               cpue_wt = mean(cpue_wt))
 }
 
-
+## compile dredge survey shell height composition
+## args
+### shad - cleaned shad data
+### raw_speciment_data - raw specimen data
+### tows - cleaned tow data 
+### sh_bin - optional shell height bin width, leave null if not binning
+f_dredge_sh_comp <- function(shad, raw_specimen, tows, sh_bin = NULL){
+  
+  shad %>%
+    group_by(year, district, bed_code, size) %>%
+    summarise(n = sum(sample_factor, na.rm = T)) %>%
+    mutate(prop = n / sum(n, na.rm = T)) %>%
+    # join to n_measured
+    left_join(specimen %>%
+                dplyr::select(tow, size, samp_grp) %>%
+                ## remove extra tow
+                filter(tow != 19010054, samp_grp %in% 1:2, !is.na(size)) %>%
+                left_join(tows) %>%
+                group_by(year, district, bed_code) %>%
+                summarise(n_measured = n())) %>%
+    rename(sh = size) %>%
+    #rearrange columnss
+    dplyr::select(year, district, bed_code, n_measured, sh, n, prop) -> out
+  
+  # bin and aggregate if appropriate
+  if(!is.null(sh_bin)){
+    out %>%
+      mutate(sh = floor(sh / sh_bin) * sh_bin) %>%
+      group_by(year, district, bed_code, n_measured, sh) %>%
+      summarise(n = sum(n),
+                prop = sum(prop)) -> out
+  }
+  
+  return(out)
+}
 
