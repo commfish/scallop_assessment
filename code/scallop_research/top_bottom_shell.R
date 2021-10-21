@@ -46,6 +46,17 @@ sh2 %>%
   arrange(lower_bin) %>% dplyr::select(-lower_bin) %>%
   write_csv("./output/scallop_research/shell_measurement/sample_table.csv")
 
+## plot of sample size by bin
+read_csv("./output/scallop_research/shell_measurement/sample_table.csv") %>%
+  # reorder rows
+  mutate(lower_bin = as.numeric(gsub("-\\d\\d mm|-\\d\\d\\d mm", "", topbin)) + 5) %>%
+  ggplot()+
+  geom_bar(aes(x = lower_bin, y = n), stat = "identity", fill = "mediumpurple")+
+  scale_y_continuous(expand = c(0,0), breaks = seq(0, 200, 10), limits = c(0, 60))+
+  scale_x_continuous(breaks = seq(0, 200, 10))+
+  labs(x = "Top Valve Shell Height (mm)", y = "Sample Size") -> x
+ggsave("./figures/scallop_research/shell_measurement/sample_size.png", plot = x, height = 3, width = 6, units = "in")
+
 
 # linear conversion ----
 
@@ -69,7 +80,7 @@ sh2 %>%
   geom_point(aes(x = topshell, y = bottomshell), color = "lightblue", alpha = 0.5)+
   geom_line(aes(x = topshell, y = bsh_pred), color = "red", alpha = 0.5)+
   geom_line(aes(x = topshell, y = topshell), linetype = 2)+
-  labs(x = "Top SH (mm)", y = "Bottom SH (mm)") -> x
+  labs(x = "Top Valve (mm)", y = "Bottom Valve (mm)") -> x
 ggsave("./figures/scallop_research/shell_measurement/scatter_fit.png", plot = x, height = 3, width = 4, units = "in")
 
 
