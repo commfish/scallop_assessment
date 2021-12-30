@@ -5,6 +5,19 @@
 
 # load ----
 library(tidyverse)
+library(patchwork)
+library(FNGr)
+library(scales)
+
+## global options
+### custom color/fill pallete
+cb_palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+### set theme (from FNGr)
+theme_set(theme_sleek() + theme(legend.position = "bottom"))
+
+# load bed strata
+strata <- read_csv("./data/statewide_scallop_survey/bed_strata.csv")
 
 
 # data prep functions ----
@@ -16,14 +29,17 @@ library(tidyverse)
 ### drop - logical, drop unneeded columns, default = T
 f_clean_log <- function(x, drop = T){ 
   x %>%
+    as_tibble() %>%
     mutate(lat = (lat_start + lat_end) / 2,
-           lon = (lon_start + lon_end) /2,
-           area_swept = distance_nm * 0.00131663) %>%
+           lon = (lon_start + lon_end) / 2,
+           area_swept = distance_nm * 0.00131663,
+           depth_avg = ifelse(is.na(depth_avg), (depth_start + depth_end) / 2, depth_avg)) %>%
     filter(haul_type %in% c("10", "Standard")) %>%
-    rename(year = cruise_year) -> tmp
+    rename(year = cruise_year,
+           bed_code = bed_name) -> tmp
   if(drop == T){
     tmp %>%
-      dplyr::select(year, cruise, tow, haul, gear_perf, district, bed_code, lat, lon, avg_depth, area_swept)
+      dplyr::select(year, cruise, tow, haul, perform, district, bed_code, lat, lon, depth_avg, area_swept)
   } else{tmp}
 }
 
@@ -35,10 +51,10 @@ f_catch_by_tow <- function(x, y){
   # remove clappers and empty shells
   x %>%
     filter(!(comname %in% c("Empty shells", "Clapper", "Clappers", "Empty_Shells, Scallop", "Empty Scallop Shells"))) %>%
-    mutate(comname = ifelse(grepl("eathervane", comname), "weathervane scallop", comname)) -> x
+    mutate(comname = ifelse(grepl("eathervane", comname), "weathervane scallop", comname)) %>%
   
-  # temporarily given small scallops a different rcode for ease of data summary
-  x %>%
+  # temporarily give small scallops a different rcode for ease of data summary
+
     mutate(rcode = ifelse((rcode == 74120 & samp_grp == 2), rcode + 9999999, rcode)) -> x
   
   # deal with all whole hauled samples
@@ -83,7 +99,8 @@ f_catch_by_tow <- function(x, y){
               by = "rcode") %>%
     dplyr::select(6, 7, 1, 8:13, 14, 2, 17, 5, 3:4, 15:16) %>%
     # change rcode of small scallops back
-    mutate(rcode = ifelse(rcode == (74120 + 9999999), 74120, rcode)) 
+    mutate(rcode = ifelse(rcode == (74120 + 9999999), 74120, rcode)) %>%
+    ungroup
 }
 
 ## separate SHAW data from all speciemen data
@@ -91,6 +108,9 @@ f_catch_by_tow <- function(x, y){
 ### x - raw specimen data (2019 - present format)
 f_get_shaw <- function(x) {
   x %>%
+    as_tibble() %>%
+    rename(year = cruise_year,
+           bed_code = bed_name) %>%
     filter(!is.na(sex)) 
 } 
 
@@ -100,21 +120,24 @@ f_get_shaw <- function(x) {
 ### y - cleaned catch by tow data (see output of f_catch_by_tow)
 f_get_shad <- function(x, y){
   x %>%
+    as_tibble() %>%
     filter(samp_grp %in% c(1, 2)) %>%
     dplyr::select(-whole_wt, -sex, -shell_num, -gonad, -meat_condition, -mud_blister,
                   -shell_worm, -shell_retained, -meat_wt) %>%
-    group_by(year, tow, samp_grp, size, damage) %>%
+    rename(year = cruise_year,
+           bed_code = bed_name) %>%
+    group_by(year, tow, samp_grp, shell_height, damage) %>%
     summarise(count = n()) %>%
     group_by(tow, samp_grp) %>%
-    mutate(n_measured = sum(count)) %>%
+    mutate(n_measured = sum(count)) %>% ungroup %>%
     left_join(y %>%
                 filter(rcode == 74120) %>%
-                dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, avg_depth,
+                dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, depth_avg,
                                area_swept, rcode, samp_grp, samp_cnt),
               by = c("tow", "samp_grp", "year")) %>%
     mutate(sample_factor = samp_cnt * (count / n_measured)) %>%
-    dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, avg_depth, area_swept,
-                  rcode, samp_grp, size, damage, sample_factor)
+    dplyr::select(year, cruise, tow, haul, district, bed_code, lat, lon, depth_avg, area_swept,
+                  rcode, samp_grp, shell_height, damage, sample_factor)
 }
 
 ## boostrap ci for abundance and biomass estimate
@@ -164,3 +187,174 @@ f_dredge_sh_comp <- function(shad, raw_specimen, tows, sh_bin = NULL){
   return(out)
 }
 
+
+# plotting functions ----
+
+## plot of abundance, round biomass, or meat biomass timeseries by bed
+### data = abundance biomaass data
+### group = sample group (1 - large, 2 - small)
+### years = year range to plot
+f_plot_abundance <- function(data, group, years){
+  
+  data %>%
+    left_join(strata, by = "bed_code") -> tmp
+  tmp %>%
+    # filter for sample group
+    filter(samp_grp == group) %>%
+    # plot
+    ggplot()+
+    geom_point(aes(x = year, y = abundance/1e6, color = bed_code))+
+    geom_line(aes(x = year, y = abundance/1e6, group = bed_code, color = bed_code))+
+    geom_errorbar(aes(x = year, ymin = abund_log_l95/1e6, ymax = abund_log_u95/1e6, color = bed_code),
+                  width = 0.05)+
+    scale_x_continuous(limits = c(years[1]-0.25, years[length(years)]+0.25), breaks = years)+
+    labs(x = NULL, y = "Abundance (millions)", color = NULL)+
+    ggtitle(tmp$district_full)+
+    theme(legend.justification = c(0, 1),
+          legend.position = c(0, 1),
+          plot.title = element_text(hjust = 0.5))+
+    scale_color_manual(values = cb_palette[1:length(unique(data$bed_code))]) -> p
+  
+  if(length(unique(data$bed_code)) == 1) {
+    p + theme(legend.position = "none") -> p}
+  
+  return(p)
+  
+}
+f_plot_biomass <- function(data, group, years){
+  
+  data %>%
+    left_join(strata, by = "bed_code") -> tmp
+  tmp %>%
+    # filter for sample group
+    filter(samp_grp == group) %>%
+    # plot
+    ggplot()+
+    geom_point(aes(x = year, y = biomass/1e3, color = bed_code))+
+    geom_line(aes(x = year, y = biomass/1e3, group = bed_code, color = bed_code))+
+    geom_errorbar(aes(x = year, ymin = biomass_log_l95/1e3, ymax = biomass_log_u95/1e3, color = bed_code),
+                  width = 0.05)+
+    scale_x_continuous(limits = c(years[1]-0.25, years[length(years)]+0.25), breaks = years)+
+    scale_y_continuous(labels = scales::comma)+
+    labs(x = NULL, y = "Round Biomass (1,000 lb)", color = NULL)+
+    ggtitle(tmp$district_full)+
+    theme(legend.justification = c(0, 1),
+          legend.position = c(0, 1),
+          plot.title = element_text(hjust = 0.5))+
+    scale_color_manual(values = cb_palette[1:length(unique(data$bed_code))]) -> p
+  
+  if(length(unique(data$bed_code)) == 1) {
+    p + theme(legend.position = "none") -> p}
+  
+  return(p)
+  
+}
+f_plot_mt_biomass <- function(data, years){
+  
+  data %>%
+    left_join(strata, by = "bed_code") -> tmp
+  tmp %>%
+    # plot
+    ggplot()+
+    geom_point(aes(x = year, y = mw_biomass/1e3, color = bed_code))+
+    geom_line(aes(x = year, y = mw_biomass/1e3, group = bed_code, color = bed_code))+
+    geom_errorbar(aes(x = year, ymin = ln_l95/1e3, ymax = ln_u95/1e3, color = bed_code),
+                  width = 0.05)+
+    scale_x_continuous(limits = c(years[1]-0.25, years[length(years)]+0.25), breaks = years)+
+    scale_y_continuous(labels = scales::comma)+
+    labs(x = NULL, y = "Meat Biomass (1,000 lb)", color = NULL)+
+    ggtitle(tmp$district_full)+
+    theme(legend.justification = c(0, 1),
+          legend.position = c(0, 1),
+          plot.title = element_text(hjust = 0.5))+
+    scale_color_manual(values = cb_palette[1:length(unique(data$bed_code))]) -> p
+  
+  if(length(unique(data$bed_code)) == 1) {
+    p + theme(legend.position = "none") -> p}
+  
+  return(p)
+  
+}
+
+## plot of shell height composition
+### data = SHAD data
+f_plot_sh_comp <- function(data) {
+  data %>%
+    left_join(strata, by = "bed_code") -> tmp
+  tmp %>%
+    ggplot()+
+    geom_histogram(aes(x = shell_height, y = ..density.., weight = sample_factor, fill = bed_code),
+                   binwidth = 3, color = "black")+
+    facet_wrap(~year, ncol = 1, scales = "free_y")+
+    labs(x = "Shell Height (mm)", y = "Density", fill = NULL)+
+    scale_fill_manual(values = cb_palette[1:length(unique(data$bed_code))])+
+    ggtitle(tmp$district_full)+
+    theme(legend.position = "bottom",
+          plot.title = element_text(hjust = 0.5)) -> p
+  
+  if(length(unique(data$bed_code)) == 1) {
+    p + theme(legend.position = "none") -> p}
+  
+  return(p)
+}
+
+## plot weak meats
+f_plot_wkmt <- function(data, years){
+  
+  data %>%
+    left_join(strata, by = "bed_code") -> tmp
+  tmp %>%
+    # plot
+    ggplot()+
+    geom_point(aes(x = year, y = wk_mts, color = bed_code))+
+    geom_line(aes(x = year, y = wk_mts, group = bed_code, color = bed_code))+
+    scale_x_continuous(limits = c(years[1]-0.25, years[length(years)]+0.25), breaks = years)+
+    labs(x = NULL, y = "Proportion Weak Meats", color = NULL)+
+    ggtitle(tmp$district_full)+
+    theme(legend.justification = c(0, 1),
+          legend.position = c(0, 1),
+          plot.title = element_text(hjust = 0.5))+
+    scale_color_manual(values = cb_palette[1:length(unique(data$bed_code))]) -> p
+  
+  if(length(unique(data$bed_code)) == 1) {
+    p + theme(legend.position = "none") -> p}
+  
+  return(p)
+  
+}
+
+## stack plots stored in tibble using library patchwork
+### data = data with list of plots as a title
+### plots = name of column that is list of ggplot grobs
+f_stack_plots <- function(data, plots){
+  # extract list and give elements names
+  data %>% 
+    ungroup () %>%
+    pull(plots) -> tmp
+  names(tmp) <- letters[1:length(tmp)]
+  
+  # create string to evaluate
+  string <- NULL
+  for(i in 1:length(names(tmp))){
+    if(i < length(names(tmp))){string <- paste0(string, "tmp$", names(tmp)[i], "/")}
+    if(i == length(names(tmp))){string <- paste0(string, "tmp$", names(tmp)[i])}
+  }
+  
+  return(eval(parse(text = string)))
+}
+f_sxs_plots <- function(data, plots){
+  # extract list and give elements names
+  data %>% 
+    ungroup () %>%
+    pull(plots) -> tmp
+  names(tmp) <- letters[1:length(tmp)]
+  
+  # create string to evaluate
+  string <- NULL
+  for(i in 1:length(names(tmp))){
+    if(i < length(names(tmp))){string <- paste0(string, "tmp$", names(tmp)[i], "|")}
+    if(i == length(names(tmp))){string <- paste0(string, "tmp$", names(tmp)[i])}
+  }
+  
+  return(eval(parse(text = string)))
+}

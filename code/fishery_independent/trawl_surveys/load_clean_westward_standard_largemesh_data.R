@@ -49,7 +49,7 @@ catch %>%
   mutate(Haul_Date = lubridate::mdy(Haul_Date),
          year = lubridate::year(Haul_Date)) %>%
   # select fields we are interested in 
-  select(year, Survey, Tow, Haul_Date, Station, Waters, Start_Lat, Start_Lon, End_Lat, End_Lon,
+  select(year, Survey, tdist, tsect, Tow, Haul_Date, Station, Waters, Start_Lat, Start_Lon, End_Lat, End_Lon,
          `Depth_Avg(fm)`, `Bottom_Temp(c)`, `Distance(km)`, RACE_code, Measured_cnt,
          `Measured_wt(kg)`, Unmeasured_cnt, `Unmeasured_wt(kg)`, Final_cnt, `Final_wt(kg)`) %>%
   # rename fields
@@ -60,14 +60,14 @@ catch %>%
          unmeasured_count = Unmeasured_cnt, unmeasured_wt_kg = `Unmeasured_wt(kg)`, 
          final_count = Final_cnt, final_wt_kg = `Final_wt(kg)`) %>%
   # compute mid lat and mid lon
-  mutate(lon = (start_lon + end_lon) / 2,
-         lat = (start_lat + end_lat) / 2,
+  mutate(lon = ifelse(!is.na(end_lon), (start_lon + end_lon) / 2, start_lon),
+         lat = ifelse(!is.na(end_lat), (start_lat + end_lat) / 2, start_lat),
          tow = as.character(tow)) %>%
   dplyr::select(-start_lon, -end_lon, -start_lat, -end_lat) -> tmp
   
 ### get a list of all tows
 tmp %>%
-  dplyr::select(Year, Survey, tow, haul_date, Station, waters, depth_fa, bottom_temp, distance_km, lon, lat) %>%
+  dplyr::select(Year, Survey, tdist, tsect, tow, haul_date, Station, waters, depth_fa, bottom_temp, distance_km, lon, lat) %>%
   # remove all duplicates
   distinct() %>%
   # join to scallop catch tows
@@ -109,15 +109,15 @@ spec %>%
   # chuck all species except for scallops
   filter(RACE_Code == 74120) %>%
   # select fields we are interested in 
-  select(year, Survey, Tow, haul_date, Station, SqMi, Start_Lat, Start_Lon, End_Lat, End_Lon,
+  select(year, Survey, Tow, haul_date, Station, SqMi, tdist, tsect, Start_Lat, Start_Lon, End_Lat, End_Lon,
          Depth_avg, Bottom_temp, Distance, RACE_Code, nSize, sampfrac) %>%
   # rename fields
   rename(Year = year, tow = Tow, start_lat = Start_Lat, start_lon = Start_Lon, 
          end_lat = End_Lat, end_lon = End_Lon, depth_fa = Depth_avg,bottom_temp = Bottom_temp, 
          distance_km = Distance, RACE_code = RACE_Code, sh = nSize) %>%
   # compute mid lat and mid lon
-  mutate(lon = (start_lon + end_lon) / 2,
-         lat = (start_lat + end_lat) / 2) %>%
+  mutate(lon = ifelse(!is.na(end_lon), (start_lon + end_lon) / 2, start_lon),
+         lat = ifelse(!is.na(end_lat), (start_lat + end_lat) / 2, start_lat)) %>%
   dplyr::select(-start_lon, - end_lon, -start_lat, -end_lat, -RACE_code) %>%
   # add scallop registration area
   filter(!is.na(lon),
