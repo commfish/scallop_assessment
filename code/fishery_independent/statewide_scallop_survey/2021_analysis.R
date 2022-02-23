@@ -2,7 +2,7 @@
 # 2021 Statewide Scallops Survey data analysis
 # author: Tyler Jackson
 # contact: tyler.jackson@alaska.gov
-# last updated: 2021/12/30
+# last updated: 2021/1/18
 
 # load ----
 library(tidyverse)
@@ -24,7 +24,7 @@ cb_palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73",
 theme_set(theme_sleek() + theme(legend.position = "bottom"))
 
 ### bed levels
-bed_levels <- c("WK1", "EK1", "YAKB")
+bed_levels <- c("WK1", "EK1", "YAKB", paste0("YAK", 1:5))
 
 ### set random number seed
 set.seed(8456)
@@ -40,6 +40,9 @@ catch_raw <- read.csv("./data/statewide_scallop_survey/catch/survey_catch_ts_tem
 ## specimen data
 specimen <- read.csv("./data/statewide_scallop_survey/specimen/survey_specimen_ts_temporary.csv")
 
+## ctd data
+ctd <- read.csv("./data/statewide_scallop_survey/survey2101_CTDpH_datasummary.csv", na.strings = "no data")
+
 # data mgmt ----
 
 ## tows
@@ -50,20 +53,26 @@ shad <- f_get_shad(specimen, catch)
 
 ## remove tow 54 from 2019 (towed twice) and change name of bed (YAKB -> EK1)
 filter(tows, tow != 19010054) %>% 
-  mutate(bed_code = ifelse((bed_code == "EK1" & lon > -144), "YAKB", bed_code)) -> tows
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code),
+         district = ifelse(district == "KSE", "KNE", district)) -> tows
 filter(catch, tow != 19010054) %>%
-  mutate(bed_code = ifelse((bed_code == "EK1" & lon > -144), "YAKB", bed_code)) -> catch 
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code),
+         district = ifelse(district == "KSE", "KNE", district)) -> catch 
 filter(shaw, tow != 19010054) %>%
-  mutate(bed_code = ifelse((bed_code == "EK1" & district == "YAK"), "YAKB", bed_code)) -> shaw 
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code),
+         district = ifelse(district == "KSE", "KNE", district)) -> shaw 
 filter(shad, tow != 19010054) %>%
-  mutate(bed_code = ifelse((bed_code == "EK1" & lon > -144), "YAKB", bed_code)) -> shad
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code),
+         district = ifelse(district == "KSE", "KNE", district)) -> shad
 
 ## edit strata so that YAKB gets the code EK1 for consistency
 strata %>% # strata loaded in custom functions
   # filter for only active stations
   filter(status == "active") %>%
+  mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code),
+         district = ifelse(district == "KSE", "KNE", district)) %>%
   ## compute bed area
-  group_by(bed_code) %>%
+  group_by(bed_code, district) %>%
   summarise(area_nm2 = sum(area_nmi2_alb),
             n_stations = n()) -> bed_area
 
@@ -184,6 +193,59 @@ x +
 ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map_upper.png", plot = p1,
        height = 5, width = 5, units = "in")
 
+
+# ctd maps ----
+
+## temperature
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_point(data = ctd, aes(x = longitude_upcast, y = latitude_upcast, color = temp_atmaxdepth), size = 2)+
+  scale_color_gradientn(colours = topo.colors(10))+
+  labs(x = NULL, y = NULL, color = "Dedgrees C")+
+  theme(legend.position = "right")-> x
+ggsave("./temp_plot.png", plot = x, width = 6, height = 3, units = "in")
+  
+## ph
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_point(data = ctd, aes(x = longitude_upcast, y = latitude_upcast, color = temp_atmaxdepth), size = 2)+
+  scale_color_gradientn(colours = topo.colors(10))+
+  labs(x = NULL, y = NULL, color = "Dedgrees C") -> x
+ggsave("./temp_plot.png", plot = x, width = 6, height = 3, units = "in")
+
+## pH
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_point(data = as_tibble(ctd), aes(x = longitude_upcast, y = latitude_upcast, color = avg_pH), size = 2)+
+  scale_color_gradientn(colours = terrain.colors(10))+
+  labs(x = NULL, y = NULL, color = "pH")+
+  theme(legend.position = "right")-> x
+ggsave("./pH_plot.png", plot = x, width = 6, height = 3, units = "in")
+
+## pH
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_point(data = as_tibble(ctd), aes(x = longitude_upcast, y = latitude_upcast, color = sal_atmaxdepth), size = 2)+
+  labs(x = NULL, y = NULL, color = "salinity")+
+  theme(legend.position = "right")-> x
+ggsave("./salinity_plot.png", plot = x, width = 6, height = 3, units = "in")
+
 # maps of cpue ----
 
 ## KSH1
@@ -243,12 +305,12 @@ ggsave("./figures/fishery_independent/2020/kne_large_cpue_abund_map.png", plot =
 # table of tows by bed ----
 
 tows %>%
-  count(year, bed_code) %>%
-  right_join(bed_area, by = "bed_code") %>%
+  count(year,district, bed_code) %>%
+  right_join(bed_area, by = c("bed_code", "district")) %>%
   #mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   arrange(bed_code) %>%
-  dplyr::select(year, bed_code, n, n_stations, area_nm2) %>%
-  filter(year == 2021) 
+  dplyr::select(year, district, bed_code, n, n_stations, area_nm2) %>%
+  filter(year == 2021) %>%
   # write output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2021/2021_strata.csv")
 
@@ -258,7 +320,7 @@ tows %>%
 ## point estimates (rnd wt biomass in lbs)
 catch %>%
   filter(rcode == 74120) %>%
-  left_join(bed_area, by = "bed_code") %>%
+  left_join(bed_area, by = c("bed_code", "district")) %>%
   group_by(year, samp_grp, district, bed_code) %>%
   summarise(cpue_abund = mean(cpue_cnt, na.rm = T),
             abundance = mean(cpue_cnt, na.rm = T) * mean(area_nm2),
@@ -284,17 +346,17 @@ abundance_biomass %>%
   dplyr::select(year, samp_grp, district, bed_code, cpue_abund, abundance, abund_ln_ci, cv_abund, cpue_biomass, biomass, 
                 biomass_ln_ci, cv_biomass) %>%
   # rearrange rows
-  filter(bed_code %in% bed_levels) %>%
-  mutate(bed_code = factor(bed_code, levels = bed_levels)) %>%
   arrange(year, samp_grp, bed_code) %>%
   # print output table
   write_csv("./output/fishery_independent/statewide_scallop_survey/2021/2021_abundance_rnd_biomass_by_bed.csv")
 
 ## plots of abundance and biomass for presentation
 abundance_biomass %>%
-  group_by(district) %>%
+  # create duplicate district column so one can be used for the plot function
+  mutate(dist = district) %>%
+  group_by(dist) %>%
   nest() %>%
-  filter(district %in% c("WKI", "EKI", "YAK")) %>%
+  filter(dist %in% c("WKI", "EKI", "YAK")) %>%
   mutate(abund_plot_large = purrr::map(data, f_plot_abundance, group = 1, years = 2016:2021),
          abund_plot_small = purrr::map(data, f_plot_abundance, group = 2, years = 2016:2021),
          biomass_plot_large = purrr::map(data, f_plot_biomass, group = 1, years = 2016:2021),
@@ -302,19 +364,19 @@ abundance_biomass %>%
 ## save plots
 ### large scallop abundance
 ggsave("./figures/fishery_independent/2021/dredge_survey_abundance_large.png", 
-       plot = f_stack_plots(ab_plots, "abund_plot_large"),
+       plot = f_stack_plots(ab_plots  %>% ungroup %>% dplyr::slice(2, 1, 3), "abund_plot_large"),
        width = 5, height = 7, units = "in")
 ### small scallop abundance
 ggsave("./figures/fishery_independent/2021/dredge_survey_abundance_small.png", 
-       plot = f_stack_plots(ab_plots, "abund_plot_small"),
+       plot = f_stack_plots(ab_plots  %>% ungroup %>% dplyr::slice(2, 1, 3), "abund_plot_small"),
        width = 5, height = 7, units = "in")
 ### large scallop biomass
 ggsave("./figures/fishery_independent/2021/dredge_survey_biomass_large.png", 
-       plot = f_stack_plots(ab_plots, "biomass_plot_large"),
+       plot = f_stack_plots(ab_plots  %>% ungroup %>% dplyr::slice(2, 1, 3), "biomass_plot_large"),
        width = 5, height = 7, units = "in")
 ### small scallop biomass
 ggsave("./figures/fishery_independent/2021/dredge_survey_biomass_small.png", 
-       plot = f_stack_plots(ab_plots, "biomass_plot_small"),
+       plot = f_stack_plots(ab_plots  %>% ungroup %>% dplyr::slice(2, 1, 3), "biomass_plot_small"),
        width = 5, height = 7, units = "in")
 
 # meat weight biomass ----
@@ -323,33 +385,35 @@ ggsave("./figures/fishery_independent/2021/dredge_survey_biomass_small.png",
 catch %>%
   filter(rcode == 74120,
          samp_grp == 1) %>%
-  group_by(year, bed_code, samp_grp, tow) %>%
+  group_by(year, district, bed_code, samp_grp, tow) %>%
   summarise(c = sum(samp_cnt, na.rm = T)) %>%
   ungroup() -> c
 
 ### number of tows by bed
 tows %>%
-  group_by(year, bed_code) %>%
+  group_by(year, district, bed_code) %>%
   summarise(n_tow = n()) %>%
   ungroup() -> n_tows
 
 ### design based estimator
 shaw %>%
-  left_join(tows %>%
-               dplyr::select(tow, bed_code),
-            by = "tow") %>%
-  rename(bed_code = bed_code.y) %>%
+   left_join(tows %>%
+                dplyr::select(tow, district, bed_code),
+             by = c("tow")) %>%
+  rename(bed_code = bed_code.y,
+         district = district.y) %>%
+
   filter(samp_grp == 1) %>%
   # calculate estimate sample variance of meat weight by tow, within bed
-  group_by(year, bed_code, tow) %>%
+  group_by(year, district, bed_code, tow) %>%
   summarise(m = n(),
             mw_bar = mean(meat_wt, na.rm = T), 
             var_mw_bar = var(meat_wt, na.rm = T) / m,
             .groups = "drop") %>%
   
-  right_join(c, by = c("year", "bed_code", "tow")) %>%
+  right_join(c, by = c("year", "district", "bed_code", "tow")) %>%
   # compute mw_hat and mw cpue
-  left_join(tows, by = c("year", "bed_code", "tow")) %>%
+  left_join(tows, by = c("year", "district", "bed_code", "tow")) %>%
   mutate(mw_hat = c * mw_bar,
          u_i = mw_hat / (area_swept * 0.83)) %>%
   # change na's from hauls that had zero catch to 0
@@ -357,11 +421,11 @@ shaw %>%
                   mw_hat = 0,
                   u_i = 0)) %>%
   # compute total meat weight biomass
-  left_join(n_tows, by = c("year", "bed_code")) %>%
-  left_join(bed_area, by = "bed_code") %>%
-  group_by(year, bed_code) %>%
+  left_join(n_tows, by = c("year", "district", "bed_code")) %>%
+  left_join(bed_area, by = c("district", "bed_code")) %>%
+  group_by(year, district, bed_code) %>%
   summarise(mw_biomass = mean(u_i, na.rm = T) * mean(area_nm2),
-            var_mw_biomass = mean(area_nm2)^2 * (var(u_i, na.rm = T) / mean(n_tow)) + mean(area_nm2) * sum(c^2 * var_mw_bar, na.rm = T) / mean(n_tow)) %>%
+            var_mw_biomass = mean(area_nm2)^2 * (var(u_i, na.rm = T) / mean(n_tow)) + mean(area_nm2) * sum(c^2 * var_mw_bar, na.rm = T) / mean(n_tow)) %>% 
   # convert grams to pounds
   mutate(mw_biomass = mw_biomass * 0.00220462,
          var_mw_biomass = var_mw_biomass * 0.00220462^2) %>%
@@ -371,7 +435,7 @@ shaw %>%
          ln_u95 = mw_biomass * exp(1.96 * sqrt(log(1 + cv^2))),
          ln_ci = paste0("[", round(ln_l95, 0), ", ", round(ln_u95, 0), "]")) %>%
   # rearrange rows
-  arrange(year, bed_code) %>%
+  arrange(year, district, bed_code) %>%
   ungroup -> mw_biomass
 
 mw_biomass %>%
@@ -382,11 +446,15 @@ mw_biomass %>%
 mw_biomass %>%
   left_join(strata %>%
               dplyr::select(bed_code, district), 
-            by = "bed_code") %>%
-  group_by(district) %>%
+            by = c("district", "bed_code")) %>%
+  # create duplicate district column so one can be used for the plot function
+  mutate(dist = district) %>%
+  group_by(dist) %>%
   nest() %>%
-  filter(district %in% c("WKI", "EKI", "YAK")) %>%
+  filter(dist %in% c("WKI", "EKI", "YAK")) %>%
   mutate(mt_biomass_plot = purrr::map(data, f_plot_mt_biomass, years = 2016:2021)) %>%
+  ungroup %>%
+  dplyr::slice(2, 1, 3) %>%
   f_stack_plots(., "mt_biomass_plot") -> x
 ggsave("./figures/fishery_independent/2021/dredge_survey_mw_biomass.png", plot = x,
        width = 5, height = 7, units = "in")
@@ -398,9 +466,10 @@ ggsave("./figures/fishery_independent/2021/dredge_survey_mw_biomass.png", plot =
 
 shad %>%
   filter(tow %in% tows$tow) %>%
-  group_by(district) %>%
+  mutate(dist = district) %>%
+  group_by(dist) %>%
   nest() %>%
-  filter(district %in% c("WKI", "EKI", "YAK")) %>%
+  filter(dist %in% c("WKI", "EKI", "YAK")) %>%
   mutate(mt_biomass_plot = purrr::map(data, f_plot_sh_comp)) -> sh_plots
 ggsave("./figures/fishery_independent/2021/wki_2021_dredge_survey_size_comp.png", 
        plot = sh_plots$mt_biomass_plot[[1]], width = 5, height = 5, units = "in")
@@ -433,6 +502,7 @@ shaw  %>%
   left_join(strata %>%
               distinct(district, district_full),
             by = "district") %>%
+  mutate(district_full = factor(district_full, levels = c("West Kayak Island", "East Kayak Island", "Yakutat"))) %>%
   
   # plot
   ggplot()+
@@ -461,16 +531,17 @@ shaw %>%
   left_join(strata %>%
               distinct(district, district_full),
             by = "district") %>%
+  mutate(district_full = factor(district_full, levels = c("West Kayak Island", "East Kayak Island", "Yakutat"))) %>%
   ggplot()+
   geom_point(aes(x = whole_wt, y = meat_wt, color = factor(year)), alpha = 0.3)+
   geom_smooth(aes(x = whole_wt, y = meat_wt, color = factor(year)), method = "gam", se = F)+
   geom_line(aes(x = whole_wt, y = whole_wt * 0.1), linetype = 2)+
-  scale_color_manual(values = cb_palette[2:6])+
+  scale_color_manual(values = cb_palette[1:5])+
   facet_wrap(~district_full, scales = "free", nrow = 1)+
   labs(x = "Round Weight (g)", y = "Meat Weight (g)", color = NULL) -> x
 
 ggsave("./figures/fishery_independent/2021/2021_dredge_survey_rwt_mwt.png", plot = x,
-       width = 6, height = 7, units = "in")
+       width = 8, height = 4, units = "in")
 
 # pathologies ----
 
@@ -481,20 +552,21 @@ shaw %>%
             by = "tow") %>%
   rename(bed_code = bed_code.y) %>%
   filter(tow %in% tows$tow) %>%
-  group_by(year, bed_code) %>%
+  group_by(year, district, bed_code) %>%
   summarise(n_shucked = n(),
             wk_mts = sum(meat_condition, na.rm = T) / n() * 100) %>%
-  ungroup() %>%
-  left_join(strata %>%
-              distinct(bed_code, district),
-            by = "bed_code") -> wk_mt
+  ungroup() -> wk_mt
 write_csv(wk_mt, "./output/fishery_independent/statewide_scallop_survey/2021/2021_weak_mts.csv")
 wk_mt %>% 
-  group_by(district) %>%
+  # create duplicate district to nest by for plot function
+  mutate(dist = district) %>%
+  group_by(dist) %>%
   nest %>%
   # filter districts surveyed this year
-  filter(district %in% c("WKI", "EKI", "YAK")) %>%
+  filter(dist %in% c("WKI", "EKI", "YAK")) %>%
   mutate(plot = purrr::map(data, f_plot_wkmt, years = 2016:2021)) %>%
+  ungroup %>%
+  dplyr::slice(2, 1, 3) %>%
   f_stack_plots(., "plot") -> x
 ggsave("./figures/fishery_independent/2021/2021_dredge_survey_wk_mts.png", plot = x,
        width = 5, height = 7, units = "in")
@@ -520,6 +592,10 @@ write_csv(mud_blister, "./output/fishery_independent/statewide_scallop_survey/20
 
 # plot
 mud_blister %>%
+  left_join(strata %>%
+              mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) %>%
+              distinct(district, district_full, bed_code), 
+            by = c("bed_code", "district")) %>%
   filter(samp_grp == 1) %>%
   pivot_longer(c(mb0, mb1, mb2, mb3, mb4), names_to = "code", values_to = "percent") %>%
   mutate(code = case_when(code == "mb0" ~ "0%",
@@ -533,11 +609,11 @@ mud_blister %>%
   geom_bar(aes(x = factor(year), y = percent, fill = code), 
            stat = "identity", position = "stack")+
   scale_fill_manual(values = cb_palette[2:6])+
-  facet_wrap(~bed_code)+
+  facet_wrap(district_full~bed_code)+
   labs(x = NULL, y = "Percent Mud Blisters", fill = NULL) -> x
     
 ggsave("./figures/fishery_independent/2021/2021_dredge_survey_mud_blister.png", plot = x,
-       width = 7, height = 3, units = "in")    
+       width = 8, height = 7, units = "in")    
 
 
 ## shell worms
@@ -561,6 +637,10 @@ write_csv(shell_worm, "./output/fishery_independent/statewide_scallop_survey/202
 
 # plot
 shell_worm %>%
+  left_join(strata %>%
+              mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)) %>%
+              distinct(district, district_full, bed_code), 
+            by = c("bed_code", "district")) %>%
   filter(samp_grp == 1) %>%
   pivot_longer(c(sw0, sw1, sw2, sw3, sw4), names_to = "code", values_to = "percent") %>%
   mutate(code = case_when(code == "sw0" ~ "0%",
@@ -574,11 +654,11 @@ shell_worm %>%
   geom_bar(aes(x = factor(year), y = percent, fill = code), 
            stat = "identity", position = "stack")+
   scale_fill_manual(values = cb_palette[2:6])+
-  facet_wrap(~bed_code)+
+  facet_wrap(district_full~bed_code)+
   labs(x = NULL, y = "Percent Shell Worm", fill = NULL) -> x
 
 ggsave("./figures/fishery_independent/2021/2021_dredge_survey_shell_worm.png", plot = x,
-       width = 7, height = 3, units = "in")  
+       width = 8, height = 7, units = "in")  
 
 # gonad condition ----
 
@@ -642,6 +722,51 @@ shaw %>%
   
 ggsave("./figures/fishery_independent/2021/2021_gonad_at_size.png", plot = x, 
        height = 10, width = 12, units = "in")
+
+
+
+
+
+# weight at size ----
+
+f_wl <- function(data) {
+  sh = data$shell_height/10
+  wt = data$whole_wt/1000
+  
+  fit = lm(log(wt) ~ log(sh))
+  coef = coef(fit)
+  #coef[1] = exp(coef[1] + sqrt(diag(vcov(fit)))[1] / 2)
+  
+  return(coef)
+}
+
+shaw %>%
+  group_by(district) %>%
+  nest() %>%
+  mutate(par = purrr::map(data, f_wl)) -> wl_fit
+
+## extact KSH
+wl_fit %>%
+  #filter(district == "KSH") %>%
+  dplyr::select(district, par) %>%
+  unnest(par)
+
+# plot for 2022 SPT presentation on SS models
+shaw %>%
+  filter(district == "KSH") %>%
+  ggplot()+
+  geom_point(aes(x = shell_height/10, y = whole_wt/1000), color = "lightgrey", alpha = 0.2)+
+  # ksh fit
+  geom_line(aes(x = shell_height/10, y = 0.000148*(shell_height/10)^2.79))+
+  # kam fit 
+  geom_line(aes(x = shell_height/10, y = 0.000143*(shell_height/10)^2.873), color = "red")+
+  labs(x = "Shell Height(cm)", y = "Round Weight (kg)") -> x
+
+ggsave("./figures/fishery_independent/2021/2021_wt_at_sh.png", plot = x, 
+       height = 3, width = 5, units = "in")
+
+
+
 
 
 

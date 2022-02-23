@@ -197,7 +197,9 @@ f_dredge_sh_comp <- function(shad, raw_specimen, tows, sh_bin = NULL){
 f_plot_abundance <- function(data, group, years){
   
   data %>%
-    left_join(strata, by = "bed_code") -> tmp
+    left_join(strata %>%
+                mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)), 
+              by = c("bed_code", "district")) -> tmp
   tmp %>%
     # filter for sample group
     filter(samp_grp == group) %>%
@@ -224,7 +226,9 @@ f_plot_abundance <- function(data, group, years){
 f_plot_biomass <- function(data, group, years){
   
   data %>%
-    left_join(strata, by = "bed_code") -> tmp
+    left_join(strata %>%
+                mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)), 
+              by = c("bed_code", "district")) -> tmp
   tmp %>%
     # filter for sample group
     filter(samp_grp == group) %>%
@@ -252,7 +256,9 @@ f_plot_biomass <- function(data, group, years){
 f_plot_mt_biomass <- function(data, years){
   
   data %>%
-    left_join(strata, by = "bed_code") -> tmp
+    left_join(strata %>%
+                mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)), 
+              by = c("bed_code", "district")) -> tmp
   tmp %>%
     # plot
     ggplot()+
@@ -279,12 +285,15 @@ f_plot_mt_biomass <- function(data, years){
 ## plot of shell height composition
 ### data = SHAD data
 f_plot_sh_comp <- function(data) {
+  
   data %>%
-    left_join(strata, by = "bed_code") -> tmp
+    left_join(strata %>%
+                mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)), 
+              by = c("bed_code", "district")) -> tmp
   tmp %>%
     ggplot()+
-    geom_histogram(aes(x = shell_height, y = ..density.., weight = sample_factor, fill = bed_code),
-                   binwidth = 3, color = "black")+
+    geom_histogram(aes(x = shell_height, y = ..density..,weight = sample_factor, fill = bed_code),
+                   binwidth = 3, color = "black", position = "stack")+
     facet_wrap(~year, ncol = 1, scales = "free_y")+
     labs(x = "Shell Height (mm)", y = "Density", fill = NULL)+
     scale_fill_manual(values = cb_palette[1:length(unique(data$bed_code))])+
@@ -302,17 +311,20 @@ f_plot_sh_comp <- function(data) {
 f_plot_wkmt <- function(data, years){
   
   data %>%
-    left_join(strata, by = "bed_code") -> tmp
+    left_join(strata %>%
+                mutate(bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code)), 
+              by = c("bed_code", "district")) -> tmp
+  
   tmp %>%
     # plot
     ggplot()+
     geom_point(aes(x = year, y = wk_mts, color = bed_code))+
     geom_line(aes(x = year, y = wk_mts, group = bed_code, color = bed_code))+
     scale_x_continuous(limits = c(years[1]-0.25, years[length(years)]+0.25), breaks = years)+
-    labs(x = NULL, y = "Proportion Weak Meats", color = NULL)+
+    labs(x = NULL, y = "Percent \n Weak Meats", color = NULL)+
     ggtitle(tmp$district_full)+
-    theme(legend.justification = c(0, 1),
-          legend.position = c(0, 1),
+    theme(legend.justification = c(0,1),
+          legend.position = c(0,1),
           plot.title = element_text(hjust = 0.5))+
     scale_color_manual(values = cb_palette[1:length(unique(data$bed_code))]) -> p
   

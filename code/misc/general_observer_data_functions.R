@@ -33,7 +33,7 @@ f_catch_rename <- function(x){
 # args:
 ## x - daily bycatch data (as downloaded directly from wiki)
 f_bycatch_rename <- function(x){
-  names(x) <- c("Fishery", "District", "ADFG", "haul", "gear_perf", "Set_date", "bed_code", "dredge_hrs", 
+  names(x) <- c("Fishery", "District", "ADFG", "Haul_ID", "haul", "gear_perf", "Set_date", "bed_code", "dredge_hrs", 
                     "est_rnd_wt", "mt_wt", "sample_hrs", "bairdi_count", "opilio_count",
                     "dungeness_count", "king_count", "halibut_count", "disc_count", "disc_wt", "broken_wt",
                     "rem_disc_wt", "clapper_count")
@@ -48,7 +48,6 @@ f_crab_size_rename <- function(x){
   x
 }
 
-
 # rename shell_height data to appropriate style
 # args:
 ## x - shell height data (as downloaded directly from wiki)
@@ -56,7 +55,6 @@ f_shell_height_rename <- function(x){
   names(x) <- c("Fishery", "District", "Haul_ID", "ADFG", "Rtnd_disc", "sh", "shell_num")
   x
 }
-
 
 # add season to data (based on Fishery field)
 # args:
@@ -94,7 +92,6 @@ f_revise_district <- function(x){
                                "YAK", district))
   }
 }
-
 
 # quick summary of fishery statistics
 # args:
@@ -256,10 +253,12 @@ f_standardize_cpue <- function(x, path, by, compute_predicted){
          est = mod$coefficients,
          se = sqrt(diag(vcov(mod)))) %>%
     filter(grepl("Intercept|Season", names(mod$coefficients))) %>%
-    mutate(std_cpue = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
-           std_cpue = exp(std_cpue + se/2) - adj,
+    mutate(par_est = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
+           par_se = se,
+           std_cpue = exp(par_est + se/2) - adj,
+           se = std_cpue * se,
            Season = unique(x$Season)) %>%
-    dplyr::select(Season, std_cpue) -> out 
+    dplyr::select(Season, par_est, par_se, std_cpue, se) -> out 
     
   if(compute_predicted == T){
   # compute standardized cpue
@@ -452,21 +451,22 @@ f_standardize_cpue2 <- function(x, path, compute_predicted = T){
 ### nh - dummy variable representing day when observer made mistake
 ### data - discard/bycatch report by day
 f_disc_nh <- function(nh, data){
+  
   if(nh == F){
     data %>%
-      summarise(effort = sum(dredge_hrs),
-                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt) / sum(sample_hrs),
+      summarise(effort = sum(dredge_hrs, na.rm = T),
+                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt, na.rm = T) / sum(sample_hrs, na.rm = T),
                 discard_lb = discard_rate_lb * effort,
-                disc_per_lb = sum(disc_count) / sum(disc_wt, broken_wt),
-                discard_rate_num = (sum(disc_count) + disc_per_lb * sum(rem_disc_wt)) / sum(sample_hrs),
+                disc_per_lb = sum(disc_count, na.rm = T) / sum(disc_wt, broken_wt, na.rm = T),
+                discard_rate_num = (sum(disc_count, na.rm = T) + disc_per_lb * sum(rem_disc_wt, na.rm = T)) / sum(sample_hrs, na.rm = T),
                 discard_num = discard_rate_num * effort)
   } else{
     data %>%
-      summarise(effort = sum(dredge_hrs),
-                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt) / sum(sample_hrs),
+      summarise(effort = sum(dredge_hrs, na.rm = T),
+                discard_rate_lb = sum(disc_wt, broken_wt, rem_disc_wt, na.rm = T) / sum(sample_hrs, na.rm = T),
                 discard_lb = discard_rate_lb * effort,
-                disc_per_lb = sum(disc_count) / sum(disc_wt),
-                discard_rate_num = (sum(disc_count) + disc_per_lb * sum(rem_disc_wt)) / sum(sample_hrs),
+                disc_per_lb = sum(disc_count, na.rm = T) / sum(disc_wt, na.rm = T),
+                discard_rate_num = (sum(disc_count, na.rm = T) + disc_per_lb * sum(rem_disc_wt, na.rm = T)) / sum(sample_hrs, na.rm = T),
                 discard_num = discard_rate_num * effort)
   }
 }
