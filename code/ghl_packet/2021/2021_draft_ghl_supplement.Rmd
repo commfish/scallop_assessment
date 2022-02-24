@@ -732,7 +732,7 @@ The 2020/21 Area M scallop fishery opened on July 1, 2020 with combined GHLs tot
 
 \begin{table}[H]
 \centering
-\caption{Area M catch summary. Meat and round weight CPUE represent nominal values.}
+\caption{Area M catch summary. Meat and round weight CPUE represent nominal values. Data since 2009/10 only includes the Unimak Bight District.}
 \label{table:mt1}
 \begin{tabular}{lcrrcccc}
 &&\multicolumn{2}{c}{Retained catch} & Dredge  & Numer  & Meat wt  & Round wt\\ 
@@ -741,7 +741,7 @@ Year & GHL & (lb meat) & (lb round) & hours & hauls & cpue$^a$ & cpue$^b$\\
 1993/94 & &	112,087	&	& 1,847	&	957	&	61	&\\
 1994/95 & & 65,282 & & 1,664 &	1,115	&	39	&\\
 1995/96 &	closed & & & & & &\\
-1996/97 &	200,000 &	12,560 & 128,800 & 327 & 177 & 38	& 394\\
+1996/97 &	200,000 &	12,560 &  & 327 & 177 & 38	& 394\\
 1997/98 &	200,000 &	51,616 & 597,546 & 1,752 & 1,050 & 29 & 341\\
 1998/99 &	200,000 &	63,290 & 617,039 & 1,612 & 681 & 39 & 383\\
 1999/00 &	200,000 &	75,535 & 778,838 & 2,025 & 1,099 & 37 & 385\\
@@ -765,7 +765,10 @@ read_csv("../../../output/observer/2021/fish_stats_M.csv") %>%
          mw_cpue = ifelse(dredge_hrs == 0, NA, mw_cpue),
          rw_cpue = ifelse(dredge_hrs == 0, NA, rw_cpue),
          dredge_hrs = ifelse(dredge_hrs == 0, NA, dredge_hrs)) -> x
-			print(xtable(x,align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
+			print(xtable(filter(x, Season != "2020/21") %>%
+			               mutate(mt_wt = as.numeric(mt_wt)),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
+					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
+			print(xtable(filter(x, Season == "2020/21"),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
 					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
 ```
 \hline
@@ -1084,7 +1087,10 @@ read_csv("../../../output/observer/2021/fish_stats_O.csv") %>%
          mw_cpue = ifelse(dredge_hrs == 0, NA, mw_cpue),
          rw_cpue = ifelse(dredge_hrs == 0, NA, rw_cpue),
          dredge_hrs = ifelse(dredge_hrs == 0, NA, dredge_hrs)) -> x
-			print(xtable(x,align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
+			print(xtable(filter(x, Season != "2020/21") %>%
+			               mutate(mt_wt = as.numeric(mt_wt)),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
+					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
+			print(xtable(filter(x, Season == "2020/21"),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
 					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
 ```
 \hline	
@@ -1327,7 +1333,10 @@ read_csv("../../../output/observer/2021/fish_stats_Q.csv") %>%
          mw_cpue = ifelse(dredge_hrs == 0, NA, mw_cpue),
          rw_cpue = ifelse(dredge_hrs == 0, NA, rw_cpue),
          dredge_hrs = ifelse(dredge_hrs == 0, NA, dredge_hrs)) -> x
-			print(xtable(x,align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE,
+			print(xtable(filter(x, Season != "2020/21") %>%
+			               mutate(mt_wt = as.numeric(mt_wt)),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
+					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
+			print(xtable(filter(x, Season == "2020/21"),align="llcrrcccc",digits=0), only.contents=TRUE, include.rownames=FALSE, 
 					floating=FALSE, include.colnames=FALSE, hline.after=NULL, format.args = list(big.mark = ","))
 ```
 \hline
@@ -1552,7 +1561,7 @@ knitr::include_graphics("../../../figures/ghl_supplement/2021/standardized_cpue_
 <!-- ``` -->
 
 
-# Cook Inlet Registration Area H
+# Cook Inlet Registration Area (H)
 The Cook Inlet Registration Area (H) consists of two beds: Kamishak North (KAMN) and South (KAMS). KAMN has been closed since the 2018 season (with no effort occuring under a 10,000 lbs GHL in the 2017 season). KAMS has been effectively closed since the 2005 season (with no effort occuring under a 5,000 lbs GHL in the 2007 - 2008 seasons). There was no dredge survey in Area H in 2020.
 
 <!-- ## Fishery independent information -->
@@ -1658,7 +1667,7 @@ The Prince William Sound Registration area (E) consists of the West Kayak Island
 The Yakutat Registration Area (D) is historically consisted of two districts (D16 and D), but was combined into a single unit for management purpposes in 2018. Area D was fished within the GHLS during the 2019/20 season. The dredge survey was conducted in area D from 2017 - 2019 within select beds, and in 2021 across all beds.
 
 ## Fishery performance
-The 2019/20 Yakutat scallop fishery opened on July 1, 2020 with a GHL of 145,000 lbs of scallop meats. Two vessels particpated in the fishery harvesting 146,165 lbs scallop meat with a CPUE of 47.1 lbs meat/dredge hour. Total round weight of retained scallops was 1,939,096 lbs with a nominal CPUE of 624 lbs/dredge hour (Table \ref{table:yakt1}). Fishing effort was spread throughout much of the district, though most occured within the YAK2 bed (Figure \ref{fig:yakeffortmap}). The spatial extent of the catch was greater than in the 2019/20 season, but still lower than most of the timeseries (Figure \ref{fig:yakextent}). Round weight CPUE underwent a slight increase from the 2019/20 season across all beds (Table \ref{table:yakstdcpue}, Figures \ref{fig:yakeffects} - \ref{fig:yakcpue}).
+The 2019/20 Yakutat scallop fishery opened on July 1, 2020 with a GHL of 145,000 lbs of scallop meats. Two vessels particpated in the fishery harvesting 146,165 lbs scallop meat with a CPUE of 47.1 lbs meat/dredge hour. Total round weight of retained scallops was 1,939,096 lbs with a nominal CPUE of 624 lbs/dredge hour (Table \ref{table:yakt1}). Fishing effort was spread throughout much of the district, though most occurred within the YAK2 bed (Figure \ref{fig:yakeffortmap}). The spatial extent of the catch was greater than in the 2019/20 season, but still lower than most of the timeseries (Figure \ref{fig:yakextent}). Round weight CPUE underwent a slight increase from the 2019/20 season across all beds (Table \ref{table:yakstdcpue}, Figures \ref{fig:yakeffects} - \ref{fig:yakcpue}).
 
 \begin{table}[H]
 \centering
