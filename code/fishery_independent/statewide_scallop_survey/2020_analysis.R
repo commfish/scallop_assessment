@@ -36,13 +36,7 @@ set.seed(8456)
 
 ## logbook data
 read.csv("./data/statewide_scallop_survey/logbook/survey_log_ts_temporary.csv") %>%
-  rename(year = cruise_year,
-         start_lat = lat_start,
-         start_lon = lon_start,
-         end_lat = lat_end,
-         end_lon = lon_end,
-         distance = distance_nm,
-         gear_perf = perform,
+  rename(gear_perf = perform,
          bed_code = bed_name,
          avg_depth = depth_avg) -> logbook
 

@@ -303,6 +303,7 @@ ggsave("./figures/fishery_independent/2021/scaled_cpue_KSE.png", plot = x, heigh
 tmp %>%
   filter(reg_area == "M",
          Year >= 2009) %>%
+  
   group_by(Year) %>%
   summarise(cpue = sum(final_wt_kg) / sum(area_swept),
             cv = sqrt(var(rw_cpue) / n()) / cpue) %>%
@@ -381,3 +382,9 @@ f_base_map +
 ggsave("./figures/fishery_independent/2021/trawl_survey_cpue_map_area_O.png",
        plot = x,
        height = 5, width = 5, units = "in")
+
+# bottom temperature ----
+wslm_catch %>%
+  rename_all(tolower) %>%
+  dplyr::select(year, haul_date, station, lon, lat, depth_fa, bottom_temp) %>%
+  write_csv("output/environmental_timeseries/westward_trawl_survey_bottom_temp.csv")

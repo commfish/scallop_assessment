@@ -150,8 +150,11 @@ f_fish_stats(catch, c("KSW"), add_ghl = T,
 ### KSE
 f_fish_stats(catch, c("KSE"), add_ghl = T, 
              path = "./output/observer/2021/fish_stats_KSE.csv")
+### KSEM
+f_fish_stats(catch, c("KSEM"), add_ghl = T, 
+             path = "./output/observer/2021/fish_stats_KSEM.csv")
 ### Area M
-f_fish_stats(catch, c("UB", "WC", "C"), add_ghl = T, 
+f_fish_stats(catch, c("UB"), add_ghl = T, 
              path = "./output/observer/2021/fish_stats_M.csv")
 ### Area O
 f_fish_stats(catch, c("O"), add_ghl = T, 
@@ -220,7 +223,7 @@ filter(tmp, District == "KSH") %>%
   summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
             nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
             nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)) %>%
-  left_join(dplyr::select(x, c(Season, std_cpue)), by = "Season") %T>%
+  left_join(dplyr::select(x, c(Season, std_cpue, se)), by = "Season") %T>%
   write_csv("./output/observer/2021/standardized_cpue_season_KSH.csv") -> x # x is a temporary object to be overwritten
 ggplot()+
   geom_violin(data = filter(tmp, District == "KSH"), 
@@ -831,6 +834,12 @@ tmp %>%
   theme(legend.position = "none") -> x
 ggsave("./figures/ghl_supplement/2021/bycatch_totals_KSW.png", plot = x,
        height = 8, width = 7, units = "in") 
+
+tmp %>%
+  filter(District == "KSE") %>%
+  select(Season, ghl, tanner_cbl, total_tanner, tanner_ratio, total_king, king_ratio,  total_dungeness,
+         dungeness_ratio, total_halibut, halibut_ratio) %T>%
+  write_csv("./output/observer/2021/bycatch_summary_KSE.csv")
 
 ### area M
 ### UB bycatch summary table
@@ -1491,7 +1500,14 @@ discards_by_day %>%
   group_by(Season, District, nh) %>%
   nest() %>%
   mutate(summary = purrr::map2(nh, data, f_disc_nh)) %>%
-  unnest(summary) -> tmp
+  unnest(summary) %>%
+  group_by(Season, District) %>%
+  summarise(sum_effort = sum(effort),
+            discard_rate_lb = weighted.mean(discard_rate_lb, w = effort),
+            discard_lb = sum(discard_lb),
+            disc_per_lb = weighted.mean(disc_per_lb, w = effort),
+            discard_rate_num = weighted.mean(discard_rate_num, w = effort),
+            discard_num = sum(discard_num)) -> tmp
 ### save plot of lbs
 tmp %>%
   ggplot(aes(x = Season, y = discard_lb, group = 1))+
@@ -1520,7 +1536,15 @@ discards_by_day %>%
   group_by(Season, District, nh) %>%
   nest() %>%
   mutate(summary = purrr::map2(nh, data, f_disc_nh)) %>%
-  unnest(c(summary)) -> tmp
+  unnest(c(summary)) %>%
+  group_by(Season, District) %>%
+  summarise(sum_effort = sum(effort),
+            discard_rate_lb = weighted.mean(discard_rate_lb, w = effort),
+            discard_lb = sum(discard_lb),
+            disc_per_lb = weighted.mean(disc_per_lb, w = effort),
+            discard_rate_num = weighted.mean(discard_rate_num, w = effort),
+            discard_num = sum(discard_num)) %>%
+  rename(effort = sum_effort) -> tmp
   
 # join discard info to catch
 catch %>%
@@ -1556,6 +1580,12 @@ tmp %>%
   dplyr::select(Season, round_weight, discard_lb, discard_num, discard_ratio, 
          discard_rate_lb, discard_rate_num, discard_M_lbs, discard_M_num) %T>%
   write_csv("./output/observer/2021/discard_summary_KSE.csv")
+#### KSEM
+tmp %>%
+  filter(District == "KSEM") %>%
+  dplyr::select(Season, round_weight, discard_lb, discard_num, discard_ratio, 
+                discard_rate_lb, discard_rate_num, discard_M_lbs, discard_M_num) %T>%
+  write_csv("./output/observer/2021/discard_summary_KSEM.csv")
 #### area K discard ratio plot
 tmp %>% 
   filter(District %in% c("KNE", "KSH", "KSW", "KSE", "KSEM")) %>%
@@ -1870,7 +1900,7 @@ tmp %>%
   labs(x = "Shell height (mm)", y = "Weighted Density", fill = NULL)+
   facet_wrap(~Season, ncol = 3, dir = "v") -> x
 ggsave("./figures/ghl_supplement/2021/sh_comp_KSE.png", plot = x,
-       height = 6, width = 7, units = "in")
+       height = 3, width = 5, units = "in")
 # UB
 tmp %>%
   filter(District == "UB") %>%
@@ -1937,7 +1967,28 @@ tmp %>%
   facet_wrap(~Season, ncol = 3, dir = "v") -> x
 ggsave("./figures/ghl_supplement/2021/sh_comp_YAK.png", plot = x,
        height = 6, width = 7, units = "in")
-
+# EKI
+tmp %>%
+  filter(District == "EKI") %>%
+  ggplot()+
+  geom_histogram(aes(x = sh, y = ..density.., weight = w, fill = Rtnd_disc), 
+                 binwidth = 5, color = "black")+
+  scale_fill_manual(values = cb_palette[2:3], labels = c("Discarded", "Retained"))+
+  labs(x = "Shell height (mm)", y = "Weighted Density", fill = NULL)+
+  facet_wrap(~Season, ncol = 3, dir = "v") -> x
+ggsave("./figures/ghl_supplement/2021/sh_comp_EKI.png", plot = x,
+       height = 2, width = 7, units = "in")
+# WKI
+tmp %>%
+  filter(District == "WKI") %>%
+  ggplot()+
+  geom_histogram(aes(x = sh, y = ..density.., weight = w, fill = Rtnd_disc), 
+                 binwidth = 5, color = "black")+
+  scale_fill_manual(values = cb_palette[2:3], labels = c("Discarded", "Retained"))+
+  labs(x = "Shell height (mm)", y = "Weighted Density", fill = NULL)+
+  facet_wrap(~Season, ncol = 3, dir = "v") -> x
+ggsave("./figures/ghl_supplement/2021/sh_comp_WKI.png", plot = x,
+       height = 3, width = 5, units = "in")
 
 
 

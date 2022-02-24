@@ -43,7 +43,7 @@ strata <- read_csv("./data/statewide_scallop_survey/bed_strata.csv")
 # data mgmt ----
 tows <- f_clean_log(logbook)
 catch <- f_catch_by_tow(catch_raw, tows)
-shaw <- f_get_shaw(specimen, tows)
+shaw <- f_get_shaw(specimen)
 shad <- f_get_shad(specimen, catch)
 
 # estimate abundance and variance ----

@@ -38,21 +38,21 @@ ghl <- read_csv("./data/metadata/ghl_revised_timeseries_2020.csv")
 ## observer/logbook data
 ### scallop haul data 2009/10 - Present
 catch <- do.call(bind_rows,
-                 lapply(paste0("data/catch/", list.files("data/catch/")), read_csv))
+                 lapply(paste0("data/observer/catch/", list.files("data/observer/catch/")), read_csv))
 ### shell heights 2009/10 - Present
 shell_height <- do.call(bind_rows,
-                   lapply(paste0("data/shell_height/", 
-                                 list.files("data/shell_height/")), read_csv))
+                   lapply(paste0("data/observer/shell_height/", 
+                                 list.files("data/observer/shell_height/")), read_csv))
 ### bycatch by day 2009/10 - Present
 bycatch <- do.call(bind_rows,
-                   lapply(paste0("data/bycatch/", list.files("data/bycatch/")), read_csv))
+                   lapply(paste0("data/observer/bycatch/", list.files("data/observer/bycatch/")), read_csv))
 ### crab bycath size data 2009/10 - Present
 crab_size <- do.call(bind_rows,
-                     lapply(paste0("data/crab_size/", list.files("data/crab_size/")), read_csv))
+                     lapply(paste0("data/observer/crab_size/", list.files("data/observer/crab_size/")), read_csv))
 
 ### shell height meat weight data 
 meat <- do.call(bind_rows,
-                     lapply(paste0("data/meat_weight/", list.files("data/meat_weight/")), read_csv))
+                     lapply(paste0("data/observer/meat_weight/", list.files("data/observer/meat_weight/")), read_csv))
 
 # data mgmt ----
 
@@ -212,7 +212,7 @@ ggsave("./figures/observer_data_report/2020/standardized_cpue_KNE.png",
 ### KSH
 #### plot by season
 f_standardize_cpue(filter(tmp, District == "KSH", dredge_hrs != 0, Bed != "Unknown"), 
-                   path = "./figures/observer_data_report/2020/std_cpue_effects_KSH.png",
+                   path = "./figures/ghl_supplement/2020/std_cpue_effects_KSH.png",
                    by = "Season") -> x
 # revise nominal values so that unknown beds are included
 filter(tmp, District == "KSH") %>%
@@ -220,8 +220,8 @@ filter(tmp, District == "KSH") %>%
   summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
             nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
             nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)) %>%
-  left_join(dplyr::select(x, c(Season, std_cpue)), by = "Season") %T>%
-  write_csv("./output/observer_summary/2020/standardized_cpue_season_KSH.csv") -> x # x is a temporary object to be overwritten
+  left_join(dplyr::select(x, c(Season, std_cpue, std_cpue_se)), by = "Season") %T>%
+  write_csv("./output/observer/2020/standardized_cpue_season_KSH.csv") -> x # x is a temporary object to be overwritten
 ggplot()+
   geom_boxplot(data = filter(tmp, District == "KSH"), 
                aes(x = Season, y = round_weight / dredge_hrs), 
@@ -1722,6 +1722,25 @@ bycatch %>%
   labs(x = NULL, y = "Intact : broken discard ratio") -> x
 ggsave("./figures/observer_data_report/2020/scallop_discard_broken_intact_ratio_KNE.png",
        plot = x, height = 3, width = 7, units = "in")
+
+bycatch %>%
+  filter(District == "KNE") %>% 
+  mutate(prop_broken = broken_wt / (disc_wt + broken_wt),
+         total_disc_wt = disc_wt + broken_wt + rem_disc_wt,
+         broken = prop_broken * total_disc_wt,
+         intact = (1 - prop_broken) * total_disc_wt) %>%
+  dplyr::select(Season, broken, intact) %>%
+  pivot_longer(2:3, names_to = "type", values_to = "wt") %>%
+  group_by(Season, type) %>%
+  summarise(wt = sum(wt, na.rm = T)) %>%
+  ggplot()+
+  geom_point(aes(x = Season, y = wt, color = type))+
+  geom_line(aes(x = Season, y = wt, group  = type, color = type))+
+  labs(x = NULL, y = "Weight (rnd lbs)", color = NULL) -> x
+ggsave("./figures/ghl_supplement/2020/scallop_discard_broken_intact_wt_KNE.png",
+       plot = x, height = 3, width = 7, units = "in")
+
+
 ### KSH
 bycatch %>%
   filter(District == "KSH") %>%
@@ -1731,6 +1750,24 @@ bycatch %>%
   labs(x = NULL, y = "Intact : broken discard ratio") -> x
 ggsave("./figures/observer_data_report/2020/scallop_discard_broken_intact_ratio_KSH.png",
        plot = x, height = 3, width = 7, units = "in")
+
+bycatch %>%
+  filter(District == "KSH") %>% 
+  mutate(prop_broken = broken_wt / (disc_wt + broken_wt),
+         total_disc_wt = disc_wt + broken_wt + rem_disc_wt,
+         broken = prop_broken * total_disc_wt,
+         intact = (1 - prop_broken) * total_disc_wt) %>%
+  dplyr::select(Season, broken, intact) %>%
+  pivot_longer(2:3, names_to = "type", values_to = "wt") %>%
+  group_by(Season, type) %>%
+  summarise(wt = sum(wt, na.rm = T)) %>%
+  ggplot()+
+  geom_point(aes(x = Season, y = wt, color = type))+
+  geom_line(aes(x = Season, y = wt, group  = type, color = type))+
+  labs(x = NULL, y = "Weight (rnd lbs)", color = NULL) -> x
+ggsave("./figures/ghl_supplement/2020/scallop_discard_broken_intact_wt_KSH.png",
+       plot = x, height = 3, width = 7, units = "in")
+
 ### KSW
 bycatch %>%
   filter(District == "KSW") %>%
@@ -1770,6 +1807,23 @@ bycatch %>%
 ggsave("./figures/observer_data_report/2020/scallop_discard_broken_intact_ratio_Q.png",
        plot = x, height = 3, width = 7, units = "in")
 
+bycatch %>%
+  filter(District == "Q") %>% 
+  mutate(prop_broken = broken_wt / (disc_wt + broken_wt),
+         total_disc_wt = disc_wt + broken_wt + rem_disc_wt,
+         broken = prop_broken * total_disc_wt,
+         intact = (1 - prop_broken) * total_disc_wt) %>%
+  dplyr::select(Season, broken, intact) %>%
+  pivot_longer(2:3, names_to = "type", values_to = "wt") %>%
+  group_by(Season, type) %>%
+  summarise(wt = sum(wt, na.rm = T)) %>%
+  ggplot()+
+  geom_point(aes(x = Season, y = wt, color = type))+
+  geom_line(aes(x = Season, y = wt, group  = type, color = type))+
+  labs(x = NULL, y = "Weight (rnd lbs)", color = NULL) -> x
+ggsave("./figures/ghl_supplement/2020/scallop_discard_broken_intact_wt_Q.png",
+       plot = x, height = 3, width = 7, units = "in")
+
 ### YAK
 bycatch %>%
   filter(District %in% c("YAK")) %>%
@@ -1778,6 +1832,23 @@ bycatch %>%
   geom_hline(yintercept = 1, linetype = 2)+
   labs(x = NULL, y = "Intact : broken discard ratio") -> x
 ggsave("./figures/observer_data_report/2020/scallop_discard_broken_intact_ratio_YAK.png",
+       plot = x, height = 3, width = 7, units = "in")
+
+bycatch %>%
+  filter(District == "YAK") %>% 
+  mutate(prop_broken = broken_wt / (disc_wt + broken_wt),
+         total_disc_wt = disc_wt + broken_wt + rem_disc_wt,
+         broken = prop_broken * total_disc_wt,
+         intact = (1 - prop_broken) * total_disc_wt) %>%
+  dplyr::select(Season, broken, intact) %>%
+  pivot_longer(2:3, names_to = "type", values_to = "wt") %>%
+  group_by(Season, type) %>%
+  summarise(wt = sum(wt, na.rm = T)) %>%
+  ggplot()+
+  geom_point(aes(x = Season, y = wt, color = type))+
+  geom_line(aes(x = Season, y = wt, group  = type, color = type))+
+  labs(x = NULL, y = "Weight (rnd lbs)", color = NULL) -> x
+ggsave("./figures/ghl_supplement/2020/scallop_discard_broken_intact_wt_YAK.png",
        plot = x, height = 3, width = 7, units = "in")
 
 # clappers ----

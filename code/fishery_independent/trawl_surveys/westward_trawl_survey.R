@@ -109,8 +109,8 @@ std_stations %>%
 ## number of stations towed in recent survey
 hauls %>%
   filter(performance <= 4,
-         !is.na(scallop_index_station_dist)) %>%
-  count(scallop_index_station_dist)
+         !is.na(scallop_index_dist)) %>%
+  count(scallop_index_dist)
 
 # cpue ----
 
@@ -183,12 +183,4 @@ ggsave("./figures/fishery_independent/2022/westward_trawl_size_comp_area_m.png",
        plot = area_m_size_comp, height = 5, width = 4, units = "in") 
 
 
-# catch of non-target scallops ----
 
-catch_all %>%
-  rename_all(tolower) %>%
-  filter(race_code %in% c(74103:74109, 74112)) %>%
-  group_by(survey) %>%
-  summarise(wt_kg = sum(`final_wt(kg)`) * 2.20462)
-            
-  

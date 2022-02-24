@@ -20,6 +20,9 @@ hauls <- read_csv("./data/race_goa_survey/race_goa_hauls.csv")
 f_shp_prep("./data/maps/mgmt_units", "Scallop_Statewide_Areas_PY", fortify = F) %>%
   spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), 
                                                  level = 1, path = "./data/maps")))) -> reg_areas
+## district polygons (currently only area K and M) for classifying district in survey tows
+f_shp_prep("./data/maps/mgmt_units", "Scallop_KM_Districts_wgs84_ksh_ksw_new_bdry", fortify = F) %>%
+  spTransform(., CRS(proj4string(raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")))) -> district_polygons
 
 ## base map
 ## high resolution map of alaska, canada
@@ -43,7 +46,10 @@ hauls %>%
   mutate(lat = (start_lat + end_lat) / 2,
          lon = (start_lon + end_lon) / 2) %>% 
   filter(!is.na(lat), !is.na(lon)) %>%
-  mutate(scal_area = f_over(x = ., y = reg_areas, label = "Area_Name")) -> hauls
+  mutate(scal_area = f_over(x = ., y = reg_areas, label = "Area_Name"),
+         scal_dist = f_over(x = ., y = district_polygons, label = "ISCALDIST")) -> hauls
+
+
 
 ## bottom temp trend
 FNGr::tickr(tibble(Year = 1984:2019), Year, 5) -> x_axis
@@ -88,10 +94,10 @@ fortify(reg_areas, region = "Area_Name") %>%
   filter(!(id %in% c("Adak", "Bristol Bay - Bering Sea"))) %>%
   ggplot()+
   geom_polygon(aes(x = long, y= lat, group = id, fill = id), alpha = 0.5)+
-  scale_fill_manual(values = cb_palette[2:8])+
+  #scale_fill_manual(values = cb_palette[2:8])+
   geom_polygon(data = canam, aes(x = long, y = lat, group = group), 
                color = NA, fill = "grey90")+
-  geom_point(data = filter(hauls, Year == 2019), aes(x = lon, y = lat), size = 0.5)+
+  geom_point(data = filter(hauls, Year == 2019), aes(x = lon, y = lat, color = scal_dist), size = 0.5)+
   labs(x = expression(paste(Longitude^o,~'W')), 
        y = expression(paste(Latitude^o,~'N')),
        fill = NULL)+
@@ -117,3 +123,10 @@ ggsave("./figures/fishery_independent/2020/goa_survey_stations.png", plot = x, h
   geom_point(aes(x = lon, y = lat, color = factor(gear_temperature)))+
   #scale_color_gradient(low = "blue", high = "red")+
   facet_wrap(~Year)
+
+# export bottom temperature data ----
+
+hauls %>%
+  rename_all(tolower) %>%
+  dplyr::select(year, station, start_time, lon, lat, bottom_depth, gear_temperature) %>%
+  write_csv("./output/environmental_timeseries/race_goa_bottom_temp.csv")
