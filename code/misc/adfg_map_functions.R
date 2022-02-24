@@ -12,6 +12,7 @@
 
 # load ----
 library(sp)
+library(spdplyr)
 library(RANN)
 library(rgdal) # requires sp, will use proj.4 if installed
 library(maptools)
@@ -30,15 +31,15 @@ library(gpclib); gpclibPermit()
 ### output will return a SpatialPolygonsDataFrame
 ### output: List. First element is a dat frame to draw a polygon, second element is the projection string
 f_shp_prep <- function(path, layer, fortify = T){
-
-shp <- readOGR(dsn = path, layer = layer)
-proj_4_string <- proj4string(shp)
-shp@data$id <- rownames(shp@data)
-
-if(fortify == T){
-shp.points <- fortify(shp, region = "id")
-list(plyr::join(shp.points, shp@data, by = "id"),
-     proj_4_string)} else {shp}
+  
+  shp <- readOGR(dsn = path, layer = layer)
+  proj_4_string <- proj4string(shp)
+  shp@data$id <- rownames(shp@data)
+  
+  if(fortify == T){
+    shp.points <- fortify(shp, region = "id")
+    list(plyr::join(shp.points, shp@data, by = "id"),
+         proj_4_string)} else {shp}
 }
 
 ## transfom AK polygon data projection
@@ -121,9 +122,56 @@ f_make_grid <- function(lat, long, by, join, values){
 ###         the output is x, with an added column denoted which polygon the point overlays
 f_over <- function(x, y, coords = c("lon", "lat"), label){
   x %>%
-    dplyr::select("lon", "lat") %>%
+    dplyr::select(coords) %>%
     SpatialPoints(., proj4string = CRS(proj4string(y))) %>%
     sp::over(., y, fn = NULL) %>%
     as_tibble() -> tmp 
   if(!missing(label)){pull(tmp, label)}
 }
+
+## wrapper of pipeline for coercing boundary points of a polygon to spatial polygon data frame
+## args:
+### x - data frame of spatial points 
+### poly_name - optional. Names of polygons in order presented in 'x'. Only used if add_name = T. Useful when coercing multiple polygons in vectorized function.
+### add_name - optional. Add polygon name to sp data frame. default = T
+### coords - coords - names of columns for spatial coordinates. Defaults are "lon" and "lat"
+
+f_make_sp_polygon_df <- function(x, poly_name, add_name = T, coords = c("lon", "lat")) {
+  
+  if(add_name == F) {
+    x %>%
+      dplyr::select(coords) %>%
+      coordinates(.) %>%
+      Polygon(.) %>%
+      list(.) %>%
+      Polygons(., 1) %>%
+      list(.) %>%
+      SpatialPolygons(.) %>%
+      SpatialPolygonsDataFrame(., data = data.frame(value = 999))
+  }
+  if(add_name == T) {
+    x %>%
+      dplyr::select(coords) %>%
+      coordinates(.) %>%
+      Polygon(.) %>%
+      list(.) %>%
+      Polygons(., 1) %>%
+      list(.) %>%
+      SpatialPolygons(.) %>%
+      SpatialPolygonsDataFrame(., data = data.frame(poly_name = poly_name))
+  }
+}
+
+# base map ----
+## base map
+## high resolution map of alaska, canada
+usa <- raster::getData("GADM", country = c("USA"), level = 1, path = "./data/maps")
+can <- raster::getData("GADM", country = c("CAN"), level = 1, path = "./data/maps")
+bind_rows(fortify(usa), fortify(can)) %>%
+  filter(long > -180, long < -129, lat > 45, lat < 70) -> canam
+ggplot()+
+  geom_polygon(data = canam, aes(x = long, y = lat, group = group), 
+               color = NA, fill = "grey90")+
+  labs(x = expression(paste(Longitude^o,~'W')), 
+       y = expression(paste(Latitude^o,~'N')))+
+  theme(panel.background = element_rect(fill = "grey70")) -> f_base_map

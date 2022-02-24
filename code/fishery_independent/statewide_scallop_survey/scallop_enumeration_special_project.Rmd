@@ -1,0 +1,92 @@
+---
+title: "Scallop Enumeration Special Project 2020"
+author: "Tyler Jackson"
+date: "7/17/2020"
+output:
+  bookdown::pdf_document2:
+    toc: yes
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(xtable)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+```
+
+# Purpose
+
+Haul 50 of the 2020 Statewide Scallop Survey was a particularly large catch and conssted of multiple size classes (more than large vs small). Extra scallops were measured in addition to the standard n = 40 in order to evaluate whether the existing sample size sufficiently approximated the shell height composition of the catch. In addition, the experiment allows for evaluating a scallop enumeration method whereby it is not necessary to count each scallop (a possible time save if more scallops were to be measured).
+
+# Methods
+
+The standard method for enumerating and measuring scallops is to separate scallops into two groups based on a size cut off of $\geq$ 100 mm shell height and gather them in baskets. Each basket is weighed (kg) and each scallop is counted before it is discard. Of the total haul sample, a subsample of n = 40 from each size group are chosen for shell height measurements to the nearest 1 mm. As an alternative method, scallops are sorted into} baskets by relative size classes (i.e., "large", "medium", "small", "tiny", etc.), it is not important for there to be a size cut off between groups, nor is it important for group classifications to be consistent among hauls (i.e., these classifications are only used within a single haul). Each basket of scallop is weighed (kg) and recorded noting to which group the basket belongs. One of baskets per group that contains (40 - 50 scallops, or more) is chosen to be the measured sample the rest are discarded. In addition to shell height measurements, a count of the measured subsample is obtained. The total catch (number; $\hat{C}$) of a haul is then estimated as $$\hat{C} = \sum_{i}^{k}W_{i}\frac{c_{i}}{w_{i}}$$ where $W_{i}$ is the measured weight of all baskets in subgroup $i$ of $k$, and $c$ and $w$ are the count and weight of the one basket subsample in subgroup $i$, respectively.
+
+\begin{table}[H]
+\centering
+\caption{Number of scallops measured by shell group in a) the standard sampling approach and b) the alternative sampling approach.}
+   
+\label{table:sampsize}
+\begin{tabular}{lcccc}
+& Sample Group Code & Sample Group Name & Number Measure\\
+\hline	
+$a)$ & 1 & large & 40\\
+& 2 & small & 40\\
+\\
+$b)$ & 7 & large-large & 50\\
+& 8 & large-small & 60\\
+& 9 & small-large & 50\\
+& 10 & small-small & 53\\
+\hline	
+\end{tabular} 
+\end{table}
+
+# Results
+Estimated number of scallops caught by size group (i.e., large, small) was a close approximation to the total number counted in the dredge (< 4\% difference). The standard sampling approach measured approximately 7\% of the total catch, and the alternative approach measured approximately 18\% of the catch. Shell height compositions between sampling approaches (in 5 mm size bins) varied slightly in the relative proportion of each apparent cohort, and the apparent lack of the smallest cohort (< 40 mm) in the standard sampling approach (Table \ref{table:sizecomptab}, Figure \ref{fig:sizecomp}).
+
+
+\begin{table}[H]
+\centering
+\caption{Estimated number of scallops caught in 5 mm size bins by sampling approach.}
+   
+\label{table:sizecomptab}
+\begin{tabular}{lccc}
+& \multicolumn{2}{c}{Estimated Scallops} \\
+Size Bin (mm) & Standard & Alternative\\ 
+\hline
+```{r midsizecomptab, results = 'asis', eval = T}	
+read_csv("../../../output/fishery_independent/2020/scallop_enumeration_size_comp.csv") -> x
+			print(xtable(x,align = "lccc", digits = 1), 
+			      only.contents = TRUE, 
+			      include.rownames = FALSE, 
+			      floating = FALSE, 
+			      include.colnames = FALSE, 
+			      hline.after = NULL, 
+			      format.args = list(big.mark = ","))
+```
+\hline	
+\end{tabular} 
+\end{table}
+
+````{r sizecomp, fig.align='center', fig.cap="Size composition probabilty density histogram by sampling approach.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/2020/scallop_enumeration_size_comp.png")
+```
+
+
+
+
+# Recommendation
+It's clear that a porportion of the sampled population was lost in the standard sampling approach for shell height measurements. While a sample size of (n = 40) will work for most hauls, samples with large catches or more than two prominent cohorts would benefit from measuring more scallops. There are three main methods that come to mind for accomplishing this:  
+
+1). You can use the alternative method presented here. The pros include: size classes need not be relevant or consistent among hauls, size composition will tend to be representative. The cons include: requires extra 'on-deck thinking' to determine size classes, redesign of data collection and storage infrastructure, introduced subsampling variance in catch estimates.  
+
+2). You can increase sample size of SHAD sampling. Without rigorous analysis of an appropriate size, I'd suggest that that ~ 100 scallops per shell group (e.g., large, small) would be sufficient (a refined number could be informed with more analysis).
+
+3). You can keep the same standard approach, but split broad shell groups when needed.
+
+My recommendation would be to go with the second or third option, for several reasons. The first option is useful when the catch is so large that it is very time consuming to count every scallop, every tow. From what I've seen, counts go by pretty fast in the typical catches for this survey, so the reward is not worth the extra added uncertainty (albeit small). In addition, while subsampling as we did in this tow as an alternative method is simple and straightforward, it is more complicated than just counting and weighing everything. The main goal and need to aviod overlooking a cohort in SHAD and SHAW sampling, which increasing the sampling size or subdividing sample groups should accomplish. Keep in mind if a sampling group is subdivided, they must be tracked separately in the data.
+
+
