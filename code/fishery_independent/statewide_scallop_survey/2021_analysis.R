@@ -2,13 +2,14 @@
 # 2021 Statewide Scallops Survey data analysis
 # author: Tyler Jackson
 # contact: tyler.jackson@alaska.gov
-# last updated: 2021/1/18
+# last updated: 2022/3/4
 
 # load ----
 library(tidyverse)
 library(sf)
 library(scales)
 library(FNGr)
+library(patchwork)
 
 ### functions for mapping
 source("./code/misc/adfg_map_functions.R")
@@ -205,21 +206,9 @@ usa %>%
   ggspatial::annotation_scale(location = "br")+
   geom_point(data = ctd, aes(x = longitude_upcast, y = latitude_upcast, color = temp_atmaxdepth), size = 2)+
   scale_color_gradientn(colours = topo.colors(10))+
-  labs(x = NULL, y = NULL, color = "Dedgrees C")+
+  labs(x = NULL, y = NULL, color = expression('Temperature ('*~degree*C*')'))+
   theme(legend.position = "right")-> x
-ggsave("./temp_plot.png", plot = x, width = 6, height = 3, units = "in")
-  
-## ph
-usa %>%
-  st_as_sf() %>%
-  ggplot()+
-  geom_sf(fill = "grey 60", size = 0.4)+
-  coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
-  ggspatial::annotation_scale(location = "br")+
-  geom_point(data = ctd, aes(x = longitude_upcast, y = latitude_upcast, color = temp_atmaxdepth), size = 2)+
-  scale_color_gradientn(colours = topo.colors(10))+
-  labs(x = NULL, y = NULL, color = "Dedgrees C") -> x
-ggsave("./temp_plot.png", plot = x, width = 6, height = 3, units = "in")
+
 
 ## pH
 usa %>%
@@ -231,10 +220,9 @@ usa %>%
   geom_point(data = as_tibble(ctd), aes(x = longitude_upcast, y = latitude_upcast, color = avg_pH), size = 2)+
   scale_color_gradientn(colours = terrain.colors(10))+
   labs(x = NULL, y = NULL, color = "pH")+
-  theme(legend.position = "right")-> x
-ggsave("./pH_plot.png", plot = x, width = 6, height = 3, units = "in")
+  theme(legend.position = "right")-> y
 
-## pH
+## salinity
 usa %>%
   st_as_sf() %>%
   ggplot()+
@@ -242,9 +230,11 @@ usa %>%
   coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
   ggspatial::annotation_scale(location = "br")+
   geom_point(data = as_tibble(ctd), aes(x = longitude_upcast, y = latitude_upcast, color = sal_atmaxdepth), size = 2)+
-  labs(x = NULL, y = NULL, color = "salinity")+
-  theme(legend.position = "right")-> x
-ggsave("./salinity_plot.png", plot = x, width = 6, height = 3, units = "in")
+  labs(x = NULL, y = NULL, color = "Salinity (ppm)")+
+  theme(legend.position = "right") -> z
+
+ggsave("./figures/fishery_independent/2021/ctd_casts.png", plot = x / y / z,
+       height = 9, width = 6, units = "in")
 
 # maps of cpue ----
 
