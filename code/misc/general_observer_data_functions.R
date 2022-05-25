@@ -19,8 +19,8 @@ library(spatstat)
 # args:
 ## x - catch data (as downloaded directly from wiki)
 f_catch_rename <- function(x){
-  names(x) <- c("Fishery", "District", "ADFG", "Trip_ID", "Haul_ID", 
-                "haul", "gear_perf", "haul_sampled", "Set_date", "bed_code", "set_lat",
+  names(x) <- c("fishery", "district", "adfg", "trip_id", "haul_id", 
+                "haul", "gear_perf", "haul_sampled", "set_date", "bed_code", "set_lat",
                 "set_lon", "statarea", "depth", "dredge_count", 
                 "dredge_width", "dredge_down", "dredge_up", "duration", 
                 "dredge_hrs", "haul_speed", "distance_nm", "area_swept", 
@@ -33,7 +33,7 @@ f_catch_rename <- function(x){
 # args:
 ## x - daily bycatch data (as downloaded directly from wiki)
 f_bycatch_rename <- function(x){
-  names(x) <- c("Fishery", "District", "ADFG", "Haul_ID", "haul", "gear_perf", "Set_date", "bed_code", "dredge_hrs", 
+  names(x) <- c("fishery", "district", "adfg", "haul_id", "haul", "gear_perf", "set_date", "bed_code", "dredge_hrs", 
                     "est_rnd_wt", "mt_wt", "sample_hrs", "bairdi_count", "opilio_count",
                     "dungeness_count", "king_count", "halibut_count", "disc_count", "disc_wt", "broken_wt",
                     "rem_disc_wt", "clapper_count")
@@ -44,7 +44,7 @@ f_bycatch_rename <- function(x){
 # args:
 ## x - crab size data (as downloaded directly from wiki)
 f_crab_size_rename <- function(x){
-  names(x) <- c("Fishery", "District", "RACE_code", "sex", "cw", "samp_frac")
+  names(x) <- c("fishery", "district", "race_code", "sex", "cw", "samp_frac")
   x
 }
 
@@ -52,7 +52,7 @@ f_crab_size_rename <- function(x){
 # args:
 ## x - shell height data (as downloaded directly from wiki)
 f_shell_height_rename <- function(x){
-  names(x) <- c("Fishery", "District", "Haul_ID", "ADFG", "Rtnd_disc", "sh", "shell_num")
+  names(x) <- c("fishery", "district", "haul_id", "adfg", "rtnd_disc", "sh", "shell_num")
   x
 }
 
@@ -60,17 +60,16 @@ f_shell_height_rename <- function(x){
 # args:
 ## x - tibble of observer or logbook data
 ## fishery_col - name of column that denotes fishery. Default = "Fishery"
-f_add_season <- function(x, fishery_col = "Fishery"){
+f_add_season <- function(x, fishery_col = "fishery"){
   x %>%
     pull(grep(fishery_col, names(.))) %>%
     str_sub(., 3, 4) %>%
     as.numeric() %>%
-    tibble(Season = .) %>%
-    mutate(Season = ifelse(Season < 80, Season + 2000, Season + 1900),
-           Season = factor(paste0(Season, "/", substring(Season + 1, 3, 4)))) %>%
+    tibble(season = .) %>%
+    mutate(season = ifelse(season < 80, season + 2000, season + 1900),
+           season = factor(paste0(season, "/", substring(season + 1, 3, 4)))) %>%
     bind_cols(x)
 }
-
 
 # revise district to align with current mgmt structure
 # args: x - any tibble containing the field 'district' or 'District'
@@ -78,36 +77,147 @@ f_revise_district <- function(x){
   
   if(!("district" %in% names(x))){
     x %>%
-      mutate(District = ifelse(bed_code %in% c("KSH5", "KSH6", "KSH7"), "KSW", District),
-             District = ifelse(District == "KSH" & set_lat < 57.7 & set_lon <= -154.35,
-                               "KSW", District),
-             District = ifelse(District %in% c("D16", "D", "YAK"),
-                               "YAK", District))
+      mutate(district = ifelse(bed_code %in% c("KSH4", "KSH5", "KSH6", "KSH7"), "KSW", district),
+             district = ifelse(district == "KSH" & ((set_lat < 57.7 & set_lon <= -154.35) | (is.na(set_lat))),
+                               "KSW", district),
+             district = ifelse(district %in% c("D16", "D", "YAK"),
+                               "YAK", district))
   } else{
     x %>%
-      mutate(district = ifelse(bed_code %in% c("KSH5", "KSH6", "KSH7"), "KSW", district),
-             district = ifelse(district == "KSH" & set_lat < 57.7 & set_lon <= -154.35,
+      mutate(district = ifelse(bed_code %in% c("KSH4", "KSH5", "KSH6", "KSH7"), "KSW", district),
+             district = ifelse(district == "KSH" & ((set_lat < 57.7 & set_lon <= -154.35) | (is.na(set_lat))),
                                "KSW", district),
              district = ifelse(district %in% c("D16", "D", "YAK"),
                                "YAK", district))
   }
 }
 
-# quick summary of fishery statistics
+# data mgmt for raw catch data prior to downstream analysis
 # args:
 ## x - catch data (as downloaded directly from wiki)
+f_clean_catch <- function(x) {
+  x %>% 
+    ## rename fields in current data (2009 - present)
+    f_catch_rename() %>%
+    ## drop phantom rows
+    drop_na(haul_id) %>%
+    ## add Season to data
+    f_add_season() %>%
+    ## classify Karluk bed as KSW district instead of KSH
+    f_revise_district() %>% 
+    ## coerce date to date class
+    mutate(set_date = lubridate::mdy(set_date)) %>%
+    ## remove tows with zero dredge hours (logbook mistake)
+    filter(dredge_hrs != 0)  %>%
+    ## coerce date to date class
+    ## fix issue with missing basket weight in 2018/19
+    mutate(round_weight = ifelse(season == "2018/19" & district == "O",
+                                 54.1 * rtnd_basket, round_weight),
+           bed_code = ifelse(bed_code == "YAKB", "EK1", bed_code))
+}
+  
+# data mgmt for raw bycatch data prior to downstream analysis
+# args:
+## x - bycatch data (as downloaded directly from wiki)  
+## catch - cleaned catch data
+f_clean_bycatch <- function(x, catch) { 
+  bycatch_wiki %>%
+    ## rename fields in bycatch data (2009 - present)
+    f_bycatch_rename() %>%
+    ## add Season to data
+    f_add_season() %>%
+    ## coerce date to date class
+    mutate(set_date = lubridate::mdy(set_date)) %>%
+    ## remove district info
+    dplyr::select(-1:-4) %>%
+    ## get beds/district info from catch data
+    ## ie no bycatch data that does not match with catch data !
+    right_join(catch %>% dplyr::select(season, adfg, district, haul_id, set_lat, set_lon), 
+              by = c("haul_id")) 
+}
+
+# data mgmt for raw crab size composition data prior to downstream analysis
+# args:
+## x - crab size data (as downloaded directly from wiki) 
+f_clean_crab_size <- function(x) { 
+  x %>%
+    ## reason fields in crab size data (2009 - present)
+    f_crab_size_rename() %>%
+    ## drp the empty column
+    dplyr::select(-7) %>%
+    ## add Season to data
+    f_add_season() %>%
+    ## revise district
+    ## unable to correct data for KSH / KSW
+    mutate(district = ifelse(district %in% c("D", "YAK", "D16"), "YAK", district)) %>%
+    ## add Species and Sex
+    mutate(species = case_when(race_code == 68560 ~ "tanner_crab",
+                               race_code == 68541 ~ "snow_crab"),
+           species = factor(species, levels = c("tanner_crab", "snow_crab")),
+           sex = case_when(sex == 1 ~ "Male",
+                           sex == 2 ~ "Female",
+                           sex == 3 ~ "Unknown"),
+           sex = factor(sex, levels = c("Male", "Female", "Unknown")))
+}
+
+# data mgmt for raw crab size composition data prior to downstream analysis
+# args:
+## x - crab size data (as downloaded directly from wiki) 
+## catch - cleaned catch data
+f_clean_sh <- function(x, catch) { 
+  x %>%
+    ## rename fields in shell_height data (2009 - present)
+    f_shell_height_rename() %>%
+    ## add season to data
+    f_add_season() %>%
+    ## revise district as in catch data
+    mutate(district = catch$district[match(.$haul_id, catch$haul_id)]) 
+}
+
+# data mgmt for raw meat weight data prior to downstream analysis
+# args:
+## x - meat weight data (as downloaded directly from wiki) 
+## catch - cleaned catch data
+f_clean_meat <-function(x, catch){
+  
+  x %>%
+    ## rename haul_id to join to catch
+    rename_all(tolower) %>%
+    ## add season to meat weight data
+    f_add_season(fishery_col = "fishery") %>%
+    ## create haul id for 2020/21
+    mutate(set_date = mdy(set_date),
+           haul_id = ifelse(season == "2020/21", 
+                            paste0(fishery,
+                                   sprintf("%06d", adfg),
+                                   year(set_date),
+                                   sprintf("%02d", month(set_date)),
+                                   sprintf("%02d", day(set_date)),
+                                   sprintf("%04d", haul)), haul_id)) %>%
+    ## join with catch data to get location (district, bed)
+    left_join(catch %>%
+                dplyr::select(haul_id, district, bed_code, set_lat, set_lon),
+              by = c("haul_id")) %>%
+    ## add retained - discard factor
+    mutate(rtnd_disc = ifelse(shell_num < 11, "retained", "discarded")) -> meat
+}
+  
+ 
+# quick summary of fishery statistics
+# args:
+## x - cleaned catch data
 ## district - abbrev. for any districts to summarise over
 ## ghl - logical include cmobine ghl. Default = F
 ## path - optional. Writes .csv file to path provided
 f_fish_stats <- function(x, district, add_ghl = F, path){
   # add Season if it is not found
-  if(!("Season" %in% names(x))) {x <- add_season(x)}
+  if(!("season" %in% names(x))) {x <- add_season(x)}
   # summarize catch data
   x %>%
     # filter to area D
-    filter(District %in% district) %>%
+    filter(district %in% district) %>%
     # summarise data 
-    group_by(Season) %>%
+    group_by(season) %>%
     summarise(mt_wt = sum(meat_weight, na.rm = T),
               rnd_wt = sum(round_weight, na.rm = T),
               dredge_hrs = sum(dredge_hrs, na.rm = T),
@@ -119,12 +229,12 @@ f_fish_stats <- function(x, district, add_ghl = F, path){
     if(!exists("ghl")){stop("tibble named 'ghl' not found")}
     else{
     ghl %>%
-      filter(District %in% district) %>%
-      group_by(Season) %>%
+      filter(district %in% district) %>%
+      group_by(season) %>%
       summarise(ghl = sum(ghl, na.rm = T)) %>%
-      left_join(., tmp, by = "Season") %>%
+      left_join(., tmp, by = "season") %>%
       replace_na(list(mt_wt = 0, rnd_wt = 0, dredge_hrs = 0, number_hauls = 0)) %>%
-      filter(as.numeric(substring(Season, 1, 4)) > 2008) -> tmp
+      filter(as.numeric(substring(season, 1, 4)) > 2008) -> tmp
     }
   }
   # write to a csv if necessary
@@ -200,31 +310,34 @@ f_extent_catch <- function(x, quant = 0.9){
 ### x - catch data to standardize containing fields for covariates. Must include 
 ### 'Season', 'Bed', 'Vessel', 'Month', 'depth', 'set_lon'.
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, Bed, and Vessel
-### by - level to summarise standardized coue over. "Season" or "Bed"
-### compute_predicted - T/F comput predicted value of CPUE based on season and all other inputs on average
 ### Outputs a point estimate for each season and effects plots of Season, Bed, 
 ### Vessel, and Month
-f_standardize_cpue <- function(x, path, by, compute_predicted){
+f_standardize_cpue <- function(x, path){
   
   x %>%
     # filter for only satisfacory dredges
-    filter(gear_perf == 1) %>% 
+    # remove anomallous data
+    filter(gear_perf == 1,
+           bed != "Unknown",
+           depth >= quantile(depth, 0.025, na.rm = T),
+           depth <= quantile(depth, 0.975, na.rm = T),
+           round_weight > 0) %>% 
     # compute cpue by dredge
     # cut off prefix of season for plotting
     mutate(rw_cpue = round_weight / dredge_hrs,
-           Season = factor(substring(Season, 3, 4))) -> y
-
-  # create cpue modifer
-  adj <- mean(y$rw_cpue)
+           season = factor(substring(season, 3, 4))) %>%
+    # only complete data
+    dplyr::select(season, vessel, month, bed, depth, set_lon, rw_cpue) %>%
+    filter(complete.cases(.)) -> y
   
   # set reference levels
-  y$Bed = relevel(y$Bed, mode(y$Bed))
-  y$Month = relevel(y$Month, mode(y$Month))
-  y$Vessel = relevel(y$Vessel, mode(y$Vessel))
+  y$bed = relevel(y$bed, mode(y$bed))
+  y$month = relevel(y$month, mode(y$month))
+  y$vessel = relevel(y$vessel, mode(y$vessel))
   
   # fit model
-  mod <- bam((rw_cpue + adj) ~ s(depth, k = 4, by = Bed) + s(set_lon, by = Bed) + 
-              Month + Vessel + Bed + Season, data = y, gamma = 1.4, 
+  mod <- bam(rw_cpue ~ s(depth, k = 4, by = bed)  + s(set_lon, by = bed) + 
+              month + vessel + bed + season, data = y, gamma = 1.4, 
               family = Gamma(link = log), select = T)
   # print diagnostics
   mod_viz <- getViz(mod)
@@ -235,114 +348,31 @@ f_standardize_cpue <- function(x, path, by, compute_predicted){
         a.hist = list(bins = 10)))
   if(!missing(path)){
   # save vessel, month, Season, and Bed effect
-  n_start <- length(unique(y$Bed)) + length(unique(y$Bed)) + 1
+  n_start <- length(unique(y$bed)) + length(unique(y$bed)) + 1
   n_end <- n_start + 3
-  ggsave(path, 
-         plot = print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
-                      l_points(size = 1, col = "grey")+
-                      l_ciBar(linetype = 1)+
-                      l_fitPoints(size = 1, col = 1)+
-                      geom_hline(yintercept = 0, linetype = 2)+
-                      theme_sleek()+
-                      theme(axis.text = element_text(size = 9)), pages = 1), 
-        height = 4, width = 7, units = "in")
+  png(path, height = 4, width = 7, units = "in", res = 300)
+  print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
+          l_points(size = 1, col = "grey")+
+          l_ciBar(linetype = 1)+
+          l_fitPoints(size = 1, col = 1)+
+          geom_hline(yintercept = 0, linetype = 2)+
+          theme_sleek()+
+          theme(axis.text = element_text(size = 9)), pages = 1)
+  dev.off()
   }
   
   # extract year effect
   tibble(par = names(mod$coefficients), 
          est = mod$coefficients,
          se = sqrt(diag(vcov(mod)))) %>%
-    filter(grepl("Intercept|Season", names(mod$coefficients))) %>%
+    filter(grepl("Intercept|season", names(mod$coefficients))) %>%
     mutate(par_est = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
            par_se = se,
-           std_cpue = exp(par_est + se/2) - adj,
+           std_cpue = exp(par_est + se/2),
            se = std_cpue * se,
-           Season = unique(x$Season)) %>%
-    dplyr::select(Season, par_est, par_se, std_cpue, se) -> out 
-    
-  if(compute_predicted == T){
-  # compute standardized cpue
-  expand_grid(Season = unique(y$Season), 
-              Month = unique(y$Month),
-              Bed = unique(y$Bed),
-              Vessel = unique(y$Vessel)) %>%
-    # set depth as mode of depth, and set_lon as mean of set_lon
-    left_join(y %>%
-                group_by(Bed) %>%
-                summarise(depth = mode(depth),
-                          set_lon = mean(set_lon, na.rm = T)),
-              by = c("Bed")) -> tmp
-  # add weights for averaging cpue
-  if(by == "Season"){
-    tmp %>%
-      left_join(y %>%
-                  group_by(Season, Bed, Month, Vessel) %>%
-                  summarise(n = n()) %>%
-                  group_by(Season) %>%
-                  mutate(w = n / sum(n, na.rm = T)),
-                by = c("Season", "Bed", "Month", "Vessel")) %>% 
-      replace_na(list(n = 0, w = 0)) %>%
-      bind_cols(tibble(fit = predict(mod, newdata = ., type = "response"), 
-                       cv_fit = predict(mod, newdata = ., type = "response", se.fit = T)$se.fit / fit)) %>%
-      mutate(fit = fit - adj,
-             se_fit = cv_fit * fit) %>%
-      group_by(Season) %>%
-      # remove if sum of weights for season/bed is zero
-      mutate(sum_w = sum(w)) %>%
-      filter(sum_w > 0) %>%
-      # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
-      summarise(std_cpue = weighted.median(fit, w = w),
-                std_cpue_se = sum(se_fit * w)) %>%
-      # correct season
-      mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
-                             as.numeric(as.character(Season)) + 2000,
-                             as.numeric(as.character(Season)) + 1900),
-             Season = paste0(Season, "/", substring(Season + 1, 3, 4))) %>%
-      # join with nominal cpue
-      left_join(x %>%
-                  group_by(Season) %>%
-                  summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
-                            nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
-                            nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)),
-                by = "Season") %>%
-      dplyr::select(Season, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue, std_cpue_se) %>%
-      as_tibble(.)
-  } else{if(by == "Bed"){
-    tmp %>%
-      left_join(y %>%
-                  group_by(Season, Bed, Month, Vessel) %>%
-                  summarise(n = n()) %>%
-                  group_by(Season, Bed) %>%
-                  mutate(w = n / sum(n, na.rm = T)),
-                by = c("Season", "Bed", "Month", "Vessel")) %>% 
-      replace_na(list(n = 0, w = 0)) %>%
-      # add fitted values from models
-      mutate(fit = predict(mod, newdata = ., type = "response") - adj) %>%
-      group_by(Season, Bed) %>%
-      # remove if sum of weights for season/bed is zero
-      mutate(sum_w = sum(w)) %>%
-      filter(sum_w > 0) %>%
-      # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
-      summarise(std_cpue = weighted.median(fit, w = w)) %>%
-      ungroup() %>%
-      # correct season
-      mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
-                             as.numeric(as.character(Season)) + 2000,
-                             as.numeric(as.character(Season)) + 1900),
-             Season = paste0(Season, "/", substring(Season + 1, 3, 4))) %>%
-      # join with nominal cpue
-      left_join(x %>%
-                  group_by(Season, Bed) %>%
-                  summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
-                            nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
-                            nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)),
-                by = c("Season", "Bed")) %>%
-      
-      dplyr::select(Season, Bed, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue) %>%
-      as_tibble(.) -> out
-  }
-    }
-  }
+           season = 2000 + as.numeric(levels(y$season))) %>%
+    arrange(season) %>%
+    dplyr::select(season, par_est, par_se, std_cpue, se) -> out 
   
   return(out)
   
@@ -355,27 +385,31 @@ f_standardize_cpue <- function(x, path, by, compute_predicted){
 ### 'Season', Vessel', 'Month', 'depth', 'set_lon'.
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, and Vessel
 ### Outputs a point estimate for each season and effects plots of Season, Vessel, and Month
-f_standardize_cpue2 <- function(x, path, compute_predicted = T){
+f_standardize_cpue2 <- function(x, path){
   
   x %>%
     # filter for only satisfacory dredges
-    filter(gear_perf == 1) %>% 
+    # remove anomallous data
+    filter(gear_perf == 1,
+           bed != "Unknown",
+           depth >= quantile(depth, 0.025, na.rm = T),
+           depth <= quantile(depth, 0.975, na.rm = T),
+           round_weight > 0) %>% 
     # compute cpue by dredge
     # cut off prefix of season for plotting
     mutate(rw_cpue = round_weight / dredge_hrs,
-           Season = factor(substring(Season, 3, 4))) -> y
-  
-  # create cpue modifer
-  adj <- mean(y$rw_cpue, na.rm = T)
-  
+           season = factor(substring(season, 3, 4))) %>%
+    # only complete data
+    dplyr::select(season, vessel, month, bed, depth, set_lon, rw_cpue) %>%
+    filter(complete.cases(.)) -> y
   
   # set reference levels
-  y$Month = relevel(y$Month, mode(y$Month))
-  y$Vessel = relevel(y$Vessel, mode(y$Vessel))
+  y$month = relevel(y$month, mode(y$month))
+  y$vessel = relevel(y$vessel, mode(y$vessel))
   
   # fit model
-  mod <- bam(rw_cpue + adj ~ s(depth, k = 4) + s(set_lon) + 
-               Month + Vessel + Season, data = y, gamma = 1.4, 
+  mod <- bam(rw_cpue ~ s(depth, k = 4) + s(set_lon) + 
+               month + vessel + season, data = y, gamma = 1.4, 
              family = Gamma(link = log), select = T)
   # print diagnostics
   mod_viz <- getViz(mod)
@@ -388,59 +422,29 @@ f_standardize_cpue2 <- function(x, path, compute_predicted = T){
     # save vessel, month, Season
     n_start <- 3
     n_end <- n_start + 4
-    ggsave(path, 
-           plot = print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
-                          l_points(size = 1, col = "grey")+
-                          l_ciBar(linetype = 1)+
-                          l_fitPoints(size = 1, col = 1)+
-                          geom_hline(yintercept = 0, linetype = 2)+
-                          theme_sleek(), pages = 1), 
-           height = 4, width = 6, units = "in")
+    png(path, height = 4, width = 7, units = "in", res = 300)
+    print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
+            l_points(size = 1, col = "grey")+
+            l_ciBar(linetype = 1)+
+            l_fitPoints(size = 1, col = 1)+
+            geom_hline(yintercept = 0, linetype = 2)+
+            theme_sleek()+
+            theme(axis.text = element_text(size = 9)), pages = 1)
+    dev.off()
   }
   
   # extract year effect
   tibble(par = names(mod$coefficients), 
          est = mod$coefficients,
          se = sqrt(diag(vcov(mod)))) %>%
-    filter(grepl("Intercept|Season", names(mod$coefficients))) %>%
-    mutate(std_cpue = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
-           std_cpue = exp(std_cpue + se/2) - adj,
-           Season = unique(x$Season)) %>%
-    dplyr::select(Season, std_cpue) -> out 
-  
-  if(compute_predicted == T){
-  # compute standardized cpue
-  expand_grid(Season = unique(y$Season), 
-              Month = unique(y$Month),
-              Vessel = unique(y$Vessel),
-              depth = mode(y$depth),
-              set_lon = mean(y$set_lon, na.rm = T)) %>%
-      left_join(y %>%
-                  group_by(Season, Month, Vessel) %>%
-                  summarise(n = n()) %>%
-                  group_by(Season) %>%
-                  mutate(w = n / sum(n, na.rm = T)),
-                by = c("Season", "Month", "Vessel")) %>% 
-      replace_na(list(n = 0, w = 0)) %>%
-      # add fitted values from models
-      mutate(fit = predict(mod, newdata = ., type = "response") - adj) %>%
-      # take the median weighted by proportion of effort allocated to each factor level within year to acheive standardized cpue   
-      group_by(Season) %>%
-      summarise(std_cpue = weighted.median(fit, w = w)) %>%
-      # correct season
-      mutate(Season = ifelse(as.numeric(as.character(Season)) < 80, 
-                             as.numeric(as.character(Season)) + 2000,
-                             as.numeric(as.character(Season)) + 1900),
-             Season = paste0(Season, "/", substring(Season + 1, 3, 4))) %>%
-      # join with nominal cpue
-      left_join(x %>%
-                  group_by(Season) %>%
-                  summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
-                            nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
-                            nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)),
-                by = "Season") %>%
-      dplyr::select(Season, nom_cpue, nom_cpue_median, nom_cpue_sd, std_cpue) %>%
-      as_tibble(.)}
+    filter(grepl("Intercept|season", names(mod$coefficients))) %>%
+    mutate(par_est = ifelse(par != "(Intercept)", est + est[par == "(Intercept)"], est),
+           par_se = se,
+           std_cpue = exp(par_est + se/2),
+           se = std_cpue * se,
+           season = 2000 + as.numeric(levels(y$season))) %>%
+    arrange(season) %>%
+    dplyr::select(season, par_est, par_se, std_cpue, se) -> out 
   
   return(out)
 }  
@@ -579,7 +583,7 @@ ggplot()+
                color = NA, fill = "grey90")+
   labs(x = expression(paste(Longitude^o,~'W')), 
        y = expression(paste(Latitude^o,~'N')))+
-  theme(panel.background = element_rect(fill = "grey70")) -> f_base_map
+  theme(panel.background = element_rect(fill = "grey70", color = "black")) -> f_base_map
 
 ## ditrict specific coordinate projections
 KNE_proj <- coord_quickmap(xlim = c(-153.2, -150), ylim = c(56.5, 58.7))
