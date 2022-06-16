@@ -85,6 +85,9 @@ f_fish_stats(catch, c("KSW"), add_ghl = T,
 ### KSE
 f_fish_stats(catch, c("KSE"), add_ghl = T, 
              path = "./output/observer/2022/fish_stats_KSE.csv")
+### KSE
+f_fish_stats(catch, c("KSEM"), add_ghl = T, 
+             path = "./output/observer/2022/fish_stats_KSEM.csv")
 ### Area M
 f_fish_stats(catch, c("UB", "WC", "C"), add_ghl = T, 
              path = "./output/observer/2022/fish_stats_M.csv")
@@ -99,10 +102,42 @@ f_fish_stats(catch, c("WKI"), add_ghl = T,
              path = "./output/observer/2022/fish_stats_WKI.csv")
 ### EKI
 f_fish_stats(catch, c("EKI"), add_ghl = T, 
-             path = "./output/observer/2021/fish_stats_EKI.csv")
+             path = "./output/observer/2022/fish_stats_EKI.csv")
 ### YAK
 f_fish_stats(catch, c("YAK"), add_ghl = T, 
-             path = "./output/observer/2021/fish_stats_YAK.csv")
+             path = "./output/observer/2022/fish_stats_YAK.csv")
+
+# trends in round_weight and number of scallops
+catch %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
+  group_by(district) %>%
+  nest() %>% 
+  mutate(plot = purrr::map2_chr(data, district, function(data, district){
+    
+    # compute season totals
+    data %>%
+      group_by(season) %>%
+      summarise(round_weight = sum(round_weight, na.rm = T),
+                scallops = sum(scallop_count, na.rm = T)) %>%
+      right_join(catch %>%
+                  distinct(season)) %>%
+      # scale scallops number for second axis
+      mutate(scallops = scallops * 0.4) %>%
+      pivot_longer(2:3) %>% 
+      # plot
+      ggplot()+
+      geom_point(aes(x = substring(season, 1, 4), y = value, shape = name))+
+      geom_line(aes(x = substring(season, 1, 4), y = value, linetype = name, group = name))+
+      scale_y_continuous(labels = scales::comma, sec.axis = sec_axis(~. / 0.4, labels = scales::comma, name = "Retained Scallops\n"))+
+      labs(y = "Retained lb (round)", shape = NULL, x = NULL, linetype = NULL)+
+      scale_shape_manual(values = c(16, 1), labels = c("Round lb", "Scallops"))+
+      scale_linetype_manual(values = 1:2, labels = c("Round lb", "Scallops"))+
+      theme(legend.position = c(1, 1),
+            legend.justification = c(1, 1)) -> p1
+    
+    ggsave(paste0("./figures/ghl_supplement/2022/retained_catch_", district, ".png"), 
+           plot = p1, height = 3, width = 7, units = "in")
+  }))
 
 
 # standardized cpue ----
@@ -123,20 +158,27 @@ catch %>%
          bed = factor(ifelse(is.na(bed), "Unknown", bed))) %>%
   # compute standardized cpue, create outputs
   group_by(district) %>%
-  nest %>%
   
-  # filter(district == "YAK") %>%
-  # pull(data) %>% .[[1]] -> x
+  nest %>%
   
   mutate(std = purrr::map2(district, data, function(district, data){
     
     # compute standardized cpue ----
-    if(district %in% c("YAK", "KSH", "KSW", "KNE", "O", "M")){
+    if(district %in% c("KSH", "KSW", "KNE", "O", "M")){
       
       data %>%
         filter(bed != "Unknown") %>%
         f_standardize_cpue(x = ., path = paste0("./figures/ghl_supplement/2022/std_cpue_effects_", district, ".png")) -> x
     }
+    
+    if(district %in% c("YAK")){
+      
+      data %>%
+        filter(bed != "Unknown") %>%
+        f_standardize_cpue(x = ., path = paste0("./figures/ghl_supplement/2022/std_cpue_effects_", district, ".png"),
+                           lon = F) -> x
+    }
+    
     if(district %in% c("Q", "EKI", "WKI")){
       
       data %>%
@@ -153,7 +195,12 @@ catch %>%
       summarise(nom_cpue = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
                 nom_cpue_median = median(round_weight / dredge_hrs, na.rm = T),
                 nom_cpue_sd = sd(round_weight / dredge_hrs, na.rm = T)) %>%
-      left_join(dplyr::select(x, c(season, std_cpue)), by = "season") %T>%
+      left_join(dplyr::select(x, c(season, std_cpue)), by = "season") %>%
+      right_join(ghl %>%
+                   mutate(season = as.numeric(substring(season, 1, 4))) %>%
+                   dplyr::select(season) %>% distinct %>%
+                   filter(season >= 2009)) %T>%
+      mutate(season = factor(season)) %>%
       write_csv(paste0("./output/observer/2022/standardized_cpue_season_", district, ".csv")) -> std_table
     
     # plot ----
@@ -217,7 +264,7 @@ catch %>%
   rename(long = set_lon, lat = set_lat) %>%
   group_by(season) %>%
   mutate(prop_effort = dredge_hrs/sum(dredge_hrs)) %>%
-  nest(data = -Season) %>%
+  nest(data = -season) %>%
   mutate(grid = purrr::map(data, f_make_grid, long = KSH_proj$limits$x,
                            lat = KSH_proj$limits$y, by = c(0.1, 0.05), 
                            values = "prop_effort")) %>%
@@ -230,7 +277,7 @@ f_base_map+
   scale_fill_gradientn(colors = topo.colors(5), values = c(0, 0.1, 0.2, 1),
                        breaks = c(0.01, 0.1, 0.2, 0.3))+
   KSH_proj+
-  facet_wrap(~Season, ncol = 3)+ 
+  facet_wrap(~season, ncol = 3)+ 
   theme(legend.position = "right",
         axis.text = element_blank(),
         axis.ticks = element_blank(),
@@ -238,7 +285,7 @@ f_base_map+
         panel.spacing = unit(0, "lines"),
         strip.text.x = element_blank(),
         strip.background = element_blank()) -> x
-ggsave("./figures/ghl_supplement/2021/effort_map_KSH.png", plot = x, 
+ggsave("./figures/ghl_supplement/2022/effort_map_KSH.png", plot = x, 
        height = 8, width = 7, unit = "in")
 ### KSW
 catch %>%
@@ -358,6 +405,64 @@ f_base_map+
         strip.background = element_blank()) -> x
 ggsave("./figures/ghl_supplement/2022/effort_map_Q.png", plot = x, 
        height = 8, width = 7, unit = "in")
+### area WKI
+catch %>%
+  filter(district %in% c("WKI")) %>%
+  rename(long = set_lon, lat = set_lat) %>%
+  group_by(season) %>%
+  mutate(prop_effort = dredge_hrs/sum(dredge_hrs)) %>%
+  nest(data = -season) %>%
+  mutate(grid = purrr::map(data, f_make_grid, long = WKI_proj$limits$x,
+                           lat = WKI_proj$limits$y, by = c(0.1, 0.05), 
+                           values = "prop_effort")) %>%
+  select(season, grid) %>%
+  unnest(grid) -> tmp
+f_base_map+
+  geom_polygon(data = drop_na(tmp), aes(x = long, y = lat, group = group, fill = prop_effort))+
+  labs(fill = "Proportion \n Effort", x = NULL, y = NULL)+
+  scale_fill_gradientn(colors = topo.colors(5), values = c(0, 0.1, 0.2, 1),
+                       breaks = c(0.01, 0.25, 0.5, 0.75))+
+  geom_text_npc(data = drop_na(tmp), aes(npcx = "right", npcy = "top", label = season), check_overlap = T)+
+  WKI_proj+
+  facet_wrap(~season, nrow = 4, drop = T)+ 
+  theme(legend.position = "right",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border= element_rect(color = 1),
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        strip.background = element_blank()) -> x
+ggsave("./figures/ghl_supplement/2022/effort_map_WKI.png", plot = x, 
+       height = 8, width = 7, unit = "in")
+### area EKI
+catch %>%
+  filter(district %in% c("EKI")) %>%
+  rename(long = set_lon, lat = set_lat) %>%
+  group_by(season) %>%
+  mutate(prop_effort = dredge_hrs/sum(dredge_hrs)) %>%
+  nest(data = -season) %>%
+  mutate(grid = purrr::map(data, f_make_grid, long = EKI_proj$limits$x,
+                           lat = EKI_proj$limits$y, by = c(0.1, 0.05), 
+                           values = "prop_effort")) %>%
+  select(season, grid) %>%
+  unnest(grid) -> tmp
+f_base_map+
+  geom_polygon(data = drop_na(tmp), aes(x = long, y = lat, group = group, fill = prop_effort))+
+  labs(fill = "Proportion \n Effort", x = NULL, y = NULL)+
+  scale_fill_gradientn(colors = topo.colors(5), values = c(0, 0.1, 0.2, 1),
+                       breaks = c(0.01, 0.25, 0.5, 0.75))+
+  geom_text_npc(data = drop_na(tmp), aes(npcx = "right", npcy = "top", label = season), check_overlap = T)+
+  EKI_proj+
+  facet_wrap(~season, nrow = 4, drop = T)+ 
+  theme(legend.position = "right",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        panel.border= element_rect(color = 1),
+        panel.spacing = unit(0, "lines"),
+        strip.text.x = element_blank(),
+        strip.background = element_blank()) -> x
+ggsave("./figures/ghl_supplement/2022/effort_map_EKI.png", plot = x, 
+       height = 8, width = 7, unit = "in")
 ### YAK
 catch %>%
   filter(district %in% c("YAK"),
@@ -393,8 +498,8 @@ ggsave("./figures/ghl_supplement/2022/effort_map_YAK.png", plot = x,
 
 ## extent of round weight catch (f_extent_catch from general_observer_data_functions.R)
 catch %>%
-  filter(!is.na(set_lon), !is.na(set_lat),
-         !district %in% c("C", "KSEM", "KSE", "WC")) %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
+  filter(!is.na(set_lon), !is.na(set_lat)) %>%
   nest(data = c(-district, -season)) %>%
   group_by(district) %>%
   mutate(extent = purrr::map_dbl(data, f_extent_catch)) %>%
@@ -402,13 +507,18 @@ catch %>%
   group_by(district, season) %>%
   summarise(CPUE = sum(round_weight, na.rm = T) / sum(dredge_hrs, na.rm = T),
             Extent = mean(extent, na.rm = T) * 1000) %>%
+  right_join(ghl %>%
+               mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
+               dplyr::select(season, district)) %>%
+  filter(substring(season, 1, 4) >= 2009) %>%
   pivot_longer(c("CPUE", "Extent"), names_to = "metric", values_to = "value") %>%
   nest(data = -district) %>%
+  filter(!district %in% c("KSEM", "KSE", "KAM")) %>%
   mutate(plot = purrr::map2_chr(data, district, function(data, district) {
     
     # plot by district
     data %>%
-      ggplot(aes(x = season, y = value, linetype = metric, group = metric))+
+      ggplot(aes(x = substring(season, 1, 4), y = value, linetype = metric, group = metric))+
       geom_point()+
       geom_line()+
       scale_y_continuous(sec.axis = sec_axis(~./1000, name = "Extent"))+
@@ -423,6 +533,7 @@ catch %>%
 
 ## get bycatch by day
 bycatch %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
   group_by(season, district, set_date) %>%
   summarise(dredge_hrs = sum(dredge_hrs, na.rm = T),
             sample_hrs = sum(sample_hrs, na.rm = T),
@@ -455,17 +566,26 @@ bycatch_by_day %>%
             total_king = sum(king_count),
             king_ratio = total_king / sum(mt_wt, na.rm = T),
             retained_mt = sum(mt_wt, na.rm = T)) %>%
-  left_join(ghl %>%
-              dplyr::select(season, district, ghl, tanner_cbl, snow_cbl, king_cbl)) %>%
-  filter(!(district %in% c("KSEM", "KSE"))) %>%
+  right_join(ghl %>%
+               mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
+               group_by(season, district) %>%
+               summarise(ghl = sum(ghl, na.rm = T),
+                         tanner_cbl = sum(tanner_cbl, na.rm = T),
+                         snow_cbl = sum(snow_cbl, na.rm = T), 
+                         king_cbl = sum(king_cbl, na.rm = T))) %>%
+  filter(!is.na(district),
+         !district %in% c("KAM", "E", "R")) %>%
   group_by(district) %>%
   nest %>%
+  
   mutate(crab_bycatch = purrr::map2(data, district, function(data, district) {
     
     # table and plots of non-target species bycatch ----
     data %>%
       select(season, ghl, tanner_cbl, total_tanner, tanner_ratio, total_king, king_ratio,  total_halibut, 
-             halibut_ratio) %T>%
+             halibut_ratio) %>%
+      filter(as.numeric(substring(season, 1, 4)) >= 2009) %>%
+      arrange(season) %T>%
       # save output table
       write_csv(paste0("./output/observer/2022/bycatch_summary_", district, ".csv")) %>%
       pivot_longer(c(grep("total", names(.))), names_to = "species", values_to = "total") %>%
@@ -491,6 +611,7 @@ bycatch_by_day %>%
     data %>%
       dplyr::select(season, total_tanner, total_snow, total_dungeness, total_king, total_halibut,
                     retained_mt) %>%
+      filter(as.numeric(substring(season, 1, 4)) >= 2009) %>%
       pivot_longer(c(total_tanner, total_snow, total_dungeness, total_king, total_halibut), 
                    names_to = "species", values_to = "total") %>%
       mutate(species = case_when(species == "total_tanner" ~ "Tanner crab",
@@ -512,6 +633,7 @@ bycatch_by_day %>%
 
 ## tanner crab bycatch size composition by district
 crab_size %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
   mutate(cw_bin = cut(cw, breaks = seq(0, 250, 5), labels = F),
          cw_bin = seq(5, 250, 5)[cw_bin]) %>%
   group_by(season, district,  species, sex, cw_bin) %>%
@@ -573,6 +695,7 @@ discards_by_day %>%
                 discard_rate_num = (sum(disc_count, na.rm = T) + disc_per_lb * sum(rem_disc_wt, na.rm = T)) / sum(sample_hrs, na.rm = T),
                 discard_num = discard_rate_num * effort) %>%
       left_join(catch %>%
+                  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
                   rename(dist = district) %>%
                   filter(dist == district) %>%
                   group_by(season) %>%
@@ -580,32 +703,37 @@ discards_by_day %>%
       # compute discard lbs ratio and overwrite object 'tmp'
       mutate(discard_ratio = discard_lb / round_weight,
              discard_M_lbs = discard_lb * 0.2,
-             discard_M_num = discard_num * 0.2) -> disc
+             discard_M_num = discard_num * 0.2) %>%
+      right_join(ghl %>%
+                   dplyr::select(season) %>%
+                   distinct %>%
+                   filter(as.numeric(substring(season, 1, 4)) >= 2009)) -> disc
     
     # save discard summary table
     disc %>%
       dplyr::select(season, round_weight, discard_lb, discard_num, discard_ratio, discard_rate_lb, discard_rate_num,
                     discard_M_lbs, discard_M_num) %>%
+      arrange(season) %>%
       write_csv(paste0("./output/observer/2022/discard_summary_", district, ".csv"))
     
     # plots ----
     disc %>%
       # fill in unfished years as space holders
       mutate(year = as.numeric(substring(season, 1, 4))) %>%
-      right_join(tibble(year = 2009:max(.$year))) -> pdisc
+      arrange(year) -> pdisc
     
     # discard number and lbs
     pdisc %>%
       ggplot()+
-      geom_point(aes(x = year, y = discard_lb))+
-      geom_line(aes(x = year, y = discard_lb, group = 1))+
+      geom_point(aes(x = factor(year), y = discard_lb))+
+      geom_line(aes(x = factor(year), y = discard_lb, group = 1))+
       labs(x = NULL, y = "Scallop Discards (lbs)")+
       scale_y_continuous(labels = scales::comma)+
       theme(legend.position = "none") -> x
     pdisc %>%
       ggplot()+
-      geom_point(aes(x = year, y = discard_num))+
-      geom_line(aes(x = year, y = discard_num, group = 1))+
+      geom_point(aes(x = factor(year), y = discard_num))+
+      geom_line(aes(x = factor(year), y = discard_num, group = 1))+
       labs(x = NULL, y = "Scallop Discards (count)")+
       scale_y_continuous(labels = scales::comma)+
       theme(legend.position = "none") -> y
@@ -614,7 +742,7 @@ discards_by_day %>%
     
     # discard ratio
     pdisc %>%
-      ggplot(aes(x = season, y = discard_ratio, 
+      ggplot(aes(x = factor(year), y = discard_ratio, 
                  group = district, color = district))+
       geom_point()+
       geom_line()+
@@ -627,6 +755,9 @@ discards_by_day %>%
     
     # intact vs broken
     data %>%
+      right_join(ghl %>%
+                   dplyr::select(season) %>% distinct) %>%
+      filter(as.numeric(substring(season, 1, 4)) >= 2009) %>%
       ggplot()+
       geom_boxplot(aes(x = substring(season, 1, 4), y = disc_wt / broken_wt), fill = cb_palette[2], alpha = 0.3)+
       geom_hline(yintercept = 1, linetype = 2)+
@@ -638,6 +769,9 @@ discards_by_day %>%
 # clappers ----
 ## compute clapper number
 bycatch %>%
+  # only the provider
+  filter(adfg == 58200) %>%
+  # all ak pen districts to area M
   mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
   group_by(season, district, set_date) %>%
   summarise(n_hauls = n(),
@@ -649,12 +783,16 @@ bycatch %>%
   summarise(effort = sum(dredge_hrs),
             clapper_rate = sum(clapper_count) / sum(sample_hrs),
             clapper_est = clapper_rate * effort) %>%
+  right_join(ghl %>%
+               dplyr::select(season, district)) %>%
+  filter(substring(season, 1, 4) >= 2009) %>%
   group_by(district) %>%
   nest() %>%
   mutate(plot = purrr::map2_chr(data, district, function(data, district) {
     
     data %>%
-      write_csv(paste0("./output/observer/2021/clappers_area_", district, ".csv"))
+      arrange(season) %>%
+      write_csv(paste0("./output/observer/2022/clappers_", district, ".csv"))
     
     data %>%
       ggplot(aes(x = substring(season, 1, 4), y = clapper_rate, group = 1))+
@@ -662,7 +800,7 @@ bycatch %>%
       geom_line()+
       scale_y_continuous(labels = comma)+
       labs(x = NULL, y = "Clapper rate (count / dredge hour)") -> x
-    ggsave(paste0("./figures/ghl_supplement/2022/clappers_area_", district, ".png"), plot = x,
+    ggsave(paste0("./figures/ghl_supplement/2022/clappers_", district, ".png"), plot = x,
            height = 3, width = 7, units = "in")
   }))
 
@@ -703,23 +841,26 @@ bycatch %>%
     
     # fake a ridgeline plot so that proportion can be weighted
     data %>%
+      filter(rtnd_disc %in% c("R", "D")) %>%
       # round sh to the 5
       mutate(sh_bin = (floor(sh/5) * 5)) %>%
       group_by(season) %>%
       mutate(sum_w = sum(w, na.rm = T)) %>%
-      group_by(season, sh_bin) %>%
+      group_by(season, sh_bin, rtnd_disc) %>%
       summarise(prop = sum(w, na.rm = T) / mean(sum_w)) %>%
       right_join(expand_grid(season = unique(.$season),
-                             sh_bin = seq(50, 200, 5))) %>%
+                             sh_bin = seq(50, 200, 5),
+                             rtnd_disc = c("R", "D"))) %>%
       replace_na(list(prop = 0)) -> tmp
     # add the edge of bin so you can plot bars
     bind_rows(tmp, tmp %>%
                 mutate(sh_bin = sh_bin + 5 - 1e-10)) %>%
       ggplot()+
-      geom_area(aes(x = sh_bin, y = prop), color = "grey40", fill = cb_palette[3], alpha = 0.5)+
+      geom_area(aes(x = sh_bin, y = prop, fill = rtnd_disc), color = "grey40", alpha = 0.5)+
       geom_text_npc(aes(npcx = "left", npcy = 0.3, label = season), check_overlap = T)+
       facet_wrap(~season, ncol = 1, dir = "v", )+
-      labs(x = "Shell Height (mm)", y = NULL) -> x
+      labs(x = "Shell Height (mm)", y = NULL, fill = NULL)+
+      scale_fill_manual(values = cb_palette[2:3], labels = c("Discarded", "Retained"))-> x
     
     if(district %in% c("KSE", "KSEM", "EKI", "C")) {
       x + theme(panel.border= element_blank(),
@@ -735,7 +876,7 @@ bycatch %>%
       
       } else {
               x + theme(panel.border= element_blank(),
-                        panel.spacing = unit(-2, "lines"),
+                        panel.spacing = unit(-1, "lines"),
                         strip.background = element_blank(),
                         strip.text.x = element_blank(),
                         axis.text.y = element_blank(),
@@ -745,7 +886,7 @@ bycatch %>%
                         panel.background = element_blank()) -> x
         nyrs = length(unique(data$season))
         ggsave(paste0("./figures/ghl_supplement/2022/sh_comp_", district, ".png"), plot = x,
-               height = (6/11) * nyrs, width = 4, units = "in")
+               height = (8/11) * nyrs, width = 4, units = "in")
             }
     
     
@@ -755,7 +896,8 @@ bycatch %>%
 # retention curves ----
 
 shell_height %>%
-  filter(!district %in% c("KSE", "KSEM", "C", "WC", "O")) %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
+  filter(!district %in% c("KSE", "KSEM", "O")) %>%
   group_by(district) %>%
   nest %>%
   mutate(ret = purrr::map2_chr(data, district, function(data, district){
@@ -775,8 +917,6 @@ shell_height %>%
       geom_point(aes(x = sh, y = retained), shape = 124, color = "grey50")+
       geom_line(aes(x = sh, y = response, group = season))+
       labs(x = "Shell Height (mm)", y = "Probability of Retention") -> x
-    ggsave(paste0("./figures/ghl_supplement/2022/retention_curve_", district, ".png"), plot = x,
-           height = 3, width = 5, units = "in")
     
     # plot trend in 50% retention
     tibble(season = unique(tmp$season),
@@ -789,9 +929,9 @@ shell_height %>%
       labs(x = NULL, y = "Shell Height (mm)", color = NULL)+
       scale_color_manual(values = c("grey60", "black"), labels = c(expression(Ret[10]), expression(Ret[50])))+
       theme(legend.position = c(1,1),
-            legend.justification = c(1,1)) -> x
-    ggsave(paste0("./figures/ghl_supplement/2022/size_at_retention_", district, ".png"), plot = x,
-           height = 3, width = 5, units = "in")
+            legend.justification = c(1,1)) -> y
+    ggsave(paste0("./figures/ghl_supplement/2022/retention_curve_", district, ".png"), plot = x / y,
+           height = 6, width = 6, units = "in")
     
   }))
   
@@ -799,15 +939,22 @@ shell_height %>%
 # gonads ----
 
 # plot of gonad condition by proportion 
-meat %>%
+meat %>% 
+  # join to haul date
+  left_join(catch %>%
+              dplyr::select(haul_id, set_date), by = "haul_id") %>%
+  # extract month
+  mutate(month = month(set_date.y),
+         month = factor(month.name[month], c(month.name[7:12], month.name[1:6])),
+         district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
   filter(!is.na(gonad_cond)) %>%
-  group_by(district, season) %>%
+  group_by(district, season, month) %>%
   mutate(tot = n(),
          gonad = case_when(gonad_cond == 1 ~ "Empty",
                            gonad_cond == 2 ~ "Intitial Recovery",
                            gonad_cond == 3 ~ "Filling",
                            gonad_cond == 4 ~ "Full"))  %>%
-  group_by(district, gonad, season, tot) %>%
+  group_by(district, gonad, season, month, tot) %>%
   summarise(prop = n()) %>%
   mutate(prop = prop / tot) %>%
   group_by(district) %>%
@@ -819,9 +966,10 @@ meat %>%
       geom_bar(aes(x = substring(season, 1, 4), y = prop, fill=factor(gonad)), stat = "identity")+
       scale_fill_manual(values = cb_palette[c(2, 4, 7, 8)])+
       guides(fill=guide_legend(nrow=2,byrow=TRUE))+
+      facet_wrap(~month)+
       labs(x = NULL, y = "Proportion", fill = NULL) -> x
     ggsave(paste0("./figures/ghl_supplement/2022/gonad_", district, ".png"), plot = x, 
-           height = 4, width = 5, units = "in")
+           height = 4, width = 7, units = "in")
     
   }))
 
@@ -830,6 +978,7 @@ meat %>%
 
 ## plot meat weight ~ shell height by district
 meat %>%
+  mutate(district = ifelse(district %in% c("UB", "C", "WC"), "M", district)) %>%
   group_by(district) %>%
   nest() %>%
   mutate(plot = purrr::map2_chr(data, district, function(data, district) {
@@ -918,7 +1067,7 @@ tibble(data = tmp,
   geom_point(aes(x = as.numeric(substring(season, 1, 4)), y = discard_ratio, color = district))+
   geom_smooth(aes(x = as.numeric(substring(season, 1, 4)), y = discard_ratio), color = 1, se = F)+
   labs(x = NULL, y = "Discard ratio (lbs discarded:lbs retained)", color = NULL) -> x
-ggsave("./figures/ghl_supplement/2021/statewide_disc_ratio.png", plot = x,
+ggsave("./figures/ghl_supplement/2022/statewide_disc_ratio.png", plot = x,
        height = 4, width = 7, units = "in")
 
 ## Shell Height Comp
