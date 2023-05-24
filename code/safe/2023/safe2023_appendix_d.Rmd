@@ -1,0 +1,197 @@
+---
+title: "Appendix D: Response to Comments"
+author: 
+date: "`r format(Sys.time(), '%B %Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: no
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# SSC April 2022 {-}
+
+\textbf{Comment}: "\textit{The FMP requires that a SAFE report be produced annually, and an FMP amendment would be required to accommodate an alternative assessment cycle. The SSC reiterates its support for such an amendment to the extent that it allows greater flexibility in scheduling the SAFE report cycle.}"
+
+\textbf{Response}: Sarah Rheinsmith (NPFMC) has initiated a motion to amend the scallop FMP to allow for setting multi-year specifications.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC requests that in the future, a map be produced of all beds that have been surveyed or fished (even if only historically). From this map, the footprint of the current fishery relative to the extent of the overall historical distribution should be provided in each SAFE.}"
+
+\textbf{Response}: Such a figure will be presented in the next version of the full SAFE (i.e., 2024).
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{If there is interest in improving the understanding of stock distribution and productivity in order to allow for the potential of an expanded fishery in the future, the SSC recommends that the State consider allocating some portion of the annual survey effort to mapping of scallop beds to better define the boundaries of existing beds.}"
+
+\textbf{Response}: The dredge survey currently uses all of its allocated time to fully sample the major harvest areas (Yakutat, Kodiak Shelikof, and Kodiak Northeast District). The next survey Operational Plan will cover 2024-2026 surveys and ADF\&G will  take this suggestion under consideration.
+
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC recommends that future modeling efforts be focused on an age-structured model (and/or other models for data-limited situations for comparison) for a single district, perhaps Yakutat where the recent fishery has been active.}"
+
+\textbf{Response}: For now, modelling efforts will continue with the Stock Synthesis framework and be focused on Kodiak Shelikof District. The Shelikof District is an active fishery, with a long history, and has undergone a dynamic trend in harvest and fishery performance. It is currently the second largest contributor to the state-wide GHL behind Yakutat District. Further, it primarily consists of a single bed which has been surveyed five times.  
+
+Yakutat District has only been surveyed across all five actively fished beds in 2019 and 2021. Prior to that, only select beds were fished during surveys. In addition, the Yakutat District appears to be a less contiguous population that undergoes somewhat different patterns of recruitment and survival among beds which may complicate model development. Yakutat District will likely be a good subject to further evaluate a population dynamics model developed for Kodiak Shelikof District. 
+
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{For future age-structured modeling efforts, the SSC has the following recommendations, in addition to those provided by the SPT:}
+\begin{itemize}
+\item \textit{The models should include discard mortality.}
+\item \textit{If survey dredge efficiency is assumed to be known, include this information as a prior on catchability and force selectivity to be 1.0 for a reasonable range of sizes rather than allowing dredge selectivity to be less than 1.0 across the entire size range.}
+\item \textit{Consider dropping the westward region large-mesh trawl survey index as it is highly uncertain. If the trawl index is retained, provide justification for the implausibly small log(SE) = 0.01 for several of the observations.}
+\item \textit{As recommended by the SPT, further work on standardizing the fishery CPUE index will be needed, including a careful evaluation of its suitability as an index of abundance by region or overall.}
+\item \textit{Provide an explicit basis for data weighting. Recent groundfish assessments may be helpful to assess the range of approaches commonly employed.}
+\item \textit{Provide a basis for the selection of the variance in recruitment deviations.}
+\item \textit{Provide a graphical summary of the fits to size-at-age data.}"
+\end{itemize}
+
+\textbf{Response}: 
+
+\begin{itemize} 
+\item All 23.x models presented include discard mortality.
+\item All models presented in this iteration applied dredge efficiency outside of the model and assumed catchability = 1 for the dredge survey. As we gain additional information on dredge efficiency - particularly the new survey dredge - I will evaluate a model using the approach suggested here. Model 23.3 assumes full selectivity throughout the size range, while other models attempt to estimate selectivity across the full size range.
+\item The Westward Region Trawl Survey data has been dropped from the analysis in all models.
+\item Additional work on CPUE standardization is presented in Appendix C.
+\item I will address the basis for data weighting in the next iteration of model development.
+\item I will address the basis for recruitment variation in the next iteration of model development.
+\item Fits to size-conditional age data are provided in Appendix B.
+\end{itemize}
+
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{Going forward, the SSC recommends that the survey team consider adjusting the survey plan to include key beds in the Yakutat Area annually rather than in alternating years. The goal would be to produce a consistent survey time series to inform the development of an assessment model and allow important comparisons between fishery independent abundance and biomass estimates and fishery-dependent nominal and standardized CPUE estimates. The SSC recognizes that this may limit survey effort in the Cook Inlet and Kodiak regions.}"
+
+\textbf{Response}: The current dredge survey Operational Plan sunsets in 2023, and any changes to District prioritization will be evaluated before the 2024 survey. Although, it is noteworthy that complete surveys of the Kodiak Shelikof, Kodiak Northeast, Kayak Island, and Yakutat Districts are responsive to management needs, and moving between Kodiak and Yakutat areas during a survey presents logistical challenges.
+
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC recommends the SPT and ADF\&G survey team consider the value of re-deploying the ADF\&G CamSled optical sampling platform relative to the current sampling methods. A recent publication (Batter et al. 2021, Journal of Shellfish Research) demonstrates the efficacy of this sampler to support abundance and biomass estimation. Importantly, the local scallop density and distribution information captured in the seabed imagery would provide independent estimates of abundance and biomass, insights into the planned dredge calibration study, and potentially support direct estimates of natural mortality (e.g., ratio of live to dead scallops), as well as support essential fish habitat assessments. If the CamSled tool is deployed, the SSC considers mapping of scallop bed boundaries to allow comparison between scallop distribution and fishing footprint to be a high priority.}"
+
+\textbf{Response}: The SPT acknowledges the utility of the CamSled in augmenting dredge surveys. There has been interest by the ADF\&G BSAI crab research program to deploy the CamSled in the Bering Sea for crab related research. If new expertise are gained as part of that effort, we will reconsider use of the CamSled for surveying scallop beds in the future.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC notes the importance of the dredge calibration experiment in interpreting the time series in the near future until the new gear has its own series. The SSC looks forward to seeing the details of the calibration study, including overall catchability and size-selectivity when the experiment is complete.}"
+
+\textbf{Response}: An brief overview of experiment details were presented as part of the 2022 scallop survey results. The primary goal of this experiment during the 2022 survey was to troubleshoot gear configuration and optimal fishing conditions for the new dredge, while the old dredge was used to sample survey stations. The 2023 survey will tow a number of hauls simultaneously in a systematic design across the survey. 
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC recommends that the survey team consider documenting uncertainty associated with
+time on bottom for the survey dredge and methods used to estimate area swept.}"
+
+\textbf{Response}: Methods for estimating area swept are documented in the current Operational Plan (Burt et al. 2021) and in section 2.3.2 of the 2022 SAFE (Equation 4). Specifically, distance fished is extracted from the fishing log, whereby the vessel captain records the moment the dredge makes bottom contact by monitoring dredge angle via the Dredgemaster and begins the 1 nmi tow. In the future survey staff plan to facilitate access of Dredgemaster data (2016-present) to directly inform time on bottom. Dredge width is constant ($x$ = 8 ft).
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC appreciated the analysts’ efforts to examine scallop data collected in the westward region
+large-mesh trawl survey. Scallop catches in this gear were small and highly variable, likely due to the survey gear not being designed for scallops. The SSC concurs with the SPT’s assessment that these data provide little additional information to inform the age-structured modeling work and continued efforts are unlikely to be fruitful. However, examination of scallop catches outside the known beds may provide insights into the locations of scallop beds not currently detected in the fishery or state-wide survey.}"
+
+\textbf{Response}: ADF\&G continues to collect information on scallop CPUE and shell height composition as part of the Westward Region large-mesh trawl survey should these data become of interest again in the future.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC recommends that the SPT consider whether the OFL levels are appropriately set using the current reference period from 1990-1997, given the more recent CPUE trends and biological information (e.g., average weight) available.}"
+
+\textbf{Response}: It's likely that a more recent reference period would better represent the current reproductive potential of the stock. An analysis of reference period will be presented in the next full SAFE (2024).
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC encourages the continued monitoring of weak meats and supports the SPT recommendation to improve collection of quantitative data for monitoring individual scallop condition indices and stock health trends. The SSC recommends the analysts and SPT consider additional observer training and other more objective sampling protocols to standardize and improve weak meat detection.}"
+
+\textbf{Response}: The ADF\&G Shellfish Observer Program will take this recommendation under consideration.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC was pleased to see that CTD data were collected during the 2021 survey reported in the SAFE. To the extent possible, the SSC recommends continuing this sampling in subsequent surveys.}"
+
+\textbf{Response}: ADF\&G plans to continue CTD data collection on future surveys.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC encourages continued investigation of trends in meat weight and whether these may be driven by environmental factors, such as temperature, in addition to the timing of the survey.}"
+
+\textbf{Response}: Preliminary analyses suggest that inter-annual differences in meat weight at size are in part driven by timing of gonad development and spawning, which is consistent with what has been observed in Atlantic sea scallops. Meat weight at size data continues to be collected as part of the ADF\&G dredge survey and observer program, though it has been difficult to collect area specific data for evaluating intra-annual fluctuation in meat weight and gonad condition, as fisheries typically only span a short window of the fishing season.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{Regarding the change in the shell height definition from the ‘top shell’ to ‘outer shell,’ the SSC appreciated the brief analysis of paired valve measurements provided. The SSC concurs with the analysts that redefining the shell height from “top valve” to “outer shell margin” is appropriate without using a conversion for survey data, given the mixed history of data collection. The analysts indicated that there are plans to conduct a similar analysis on shells collected during the fishery. The SSC looks forward to seeing this analysis.}"
+
+\textbf{Response}: The ADF\&G Shellfish Observer Program collected paired measurements on 351 shells ranging from 8 - 203 mm shell height (top valve). The estimated conversion from top to bottom valve measurements was $L_{bottom} = 1.018 L_{top}$ (below), which about the same as what has been estimated based on survey collected shells ($L_{bottom} = 1.02 L_{top}$). Observers began collecting shell height measurement of the "outer shell margin" as opposed to "top valve" in the 2022/23 season.
+
+```{r shellmeasfig, echo = F, fig.align = 'center', fig.cap="Paired top and bottom valve measurements for observer collected shell height data. The dotted line represent a 1:1 relationship and the solid red line represent the linear fit to the data.", eval = T}
+knitr::include_graphics("../../../figures/scallop_research/shell_measurement/scatter_fit_observer_data.png")
+```
+
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC noted that although the scallop fishery has a small spatial footprint, scallop fishing should be included in future fishing effects modeling because of the bottom-tending characteristics and rigid nature of the gear.}"
+
+\textbf{Response}: The SPT and ADF\&G will help facilitate these data being included in fishing effects modelling.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC suggests that the SPT and ADF\&G survey team may benefit from a deeper examination of recent and ongoing science and management efforts for Atlantic sea scallops, including development of appropriate survey designs, cooperative survey data collection, and ecosystem interactions and effects, particularly with regard to management in the context of choke species, as well as invasive species such as the tunicate Didemnum vexillum.}"
+
+\textbf{Response}: ADF\&G will continue to follow research and management of Atlantic sea scallops to better inform dredge survey design, observer data collection, and management of weathervane scallops.
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC recommends that the SPT consider the value of a study on the genetics of scallops to help define stock structure.}"
+
+\textbf{Response}: The SPT agrees there would be value in assessing genetic and population connectivity of weathervane scallops throughout Alaska, particularly among its sub-regions (i.e., Bering Sea, eastern/western GOA).
+\noindent\rule{\textwidth}{0.4pt}
+
+<!-- ---- -->
+
+\textbf{Comment}: "\textit{The SSC supports the SPT recommendations to streamline the SAFE document by including the
+survey history and methods via references to the appropriate ADF\&G documents. In addition,
+reductions in the area-specific fishery performance sections may also be warranted as these do not
+directly inform stock status determination. Finally, several minor editorial issues should be
+reconciled if these sections continue to be included:}
+\begin{itemize}
+\item \textit{Table 2.2 headers missing for 'total' and 'sampled' stations.}
+\item \textit{Tables 4.4, 4.5, 4.6: why are there no discard mortality estimates?}
+\item \textit{Table 4.11, 4.12 report an order of magnitude lower discard mortality rates – are these correct? If so, perhaps include a comment on why this is the case.}
+\item \textit{If trawl data are to be reported, please convert to lb/nm2 instead of kg/km for comparability
+with dredge data.}
+\item \textit{Check accuracy of numbers presented for OY and OFL on page 6 section 1.1 and MSST on
+page 8.}
+\item \textit{In Table 2.1, separate landings and discards so trends can be discerned.}"
+\end{itemize}
+
+\textbf{Response}: The SPT notes these editorial comments. There will be broader scale changes to the format of the 2024 full SAFE as we determine what information are necessary, or appropriately reported elsewhere. There is also interest in making the scallop SAFE more consistent with the format of crab SAFE documents.  
+
+There was error in reporting GHL and fishery harvest in the 2022 SAFE document. Reporting for this and future SAFE documents will be done using Bookdown so that reported statistics can be linked directly to raw data - thus avoiding transcription and addition error.
+
+

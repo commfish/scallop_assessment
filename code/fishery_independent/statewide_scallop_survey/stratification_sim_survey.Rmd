@@ -1,0 +1,791 @@
+---
+title: "Dredge Survey Design Simulations"
+author: "Tyler Jackson"
+output:
+  bookdown::pdf_document2:
+    toc: yes
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(xtable)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+```
+
+# Purpose {-}
+
+This document details a simulation experiment in which age structured populations representing scallop beds were generated and sampled using various sampling designs. 
+
+# Methods {-}
+### Survey Grids {-}
+
+Survey grids were generated using the ```make_grid()``` function within R package $SimSurvey$ (Regular et al. 2020). Each survey grid was rectangular shaped, 40 km long (i.e, x-axis) by 20 km wide (i.e., y-axis). Cells within the grid that portions of the population were assigned to were 2 km x 2 km. Grids were stratified differently by depth profile. The first grid ("Grid-1") ranged 50 - 150 m in depth following a sigmoidal slope with a narrow shelf at 100 m, and included three strata: 50 - 94 m, 95 - 104 m, and 105 - 150 m. The second grid ("Grid-2") also ranged from 50 - 150 m in depth, but consisted of a continuous linear slope that included two strata: 50 - 100 m and 101 - 150 m. The third grid ("Grid-3") was a flat plain at 100 m and was not stratified (Figure \ref{fig:surveygrids}).
+
+
+### Population Simulation {-}
+
+A dynamic age- and length-structured population was simulated over 20 years using the ```sim_abundance()``` function within $SimSurvey$ which uses an exponential decay cohort model with age-0 recruitment, total mortality, and von Bertalanffy growth (see Regular et al. 2020 for full model description). Population parameters were set to loosely represent a generic weathervane scallop population (Table \ref{table:poppars}). Individuals were considered exploitable at age-4 ($\sim$ 100 mm), so total mortality from ages 0-3 only reflects assumed natural mortality. Over the 20 year timeseries the population undergoes short periods of relative stability, as well as steep increases and decreases in abundance of exploitable age classes (Figure \ref{fig:poptrend}).
+
+### Distributions {-}
+
+The population was distributed throughout each survey grid with autocorrelation among age classes and years using the ```sim_distribution()``` function of $SimSurvey$ (Regular et al. 2020). Distributions varied by the degree of clustering and covariance across years and ages. Population density in relation to depth was parabolic and remained constant across all grids and distributions (Figure \ref{fig:depthparab}). Four scenarios year spatial correlation ($\phi_{\xi, year}$) and spatial correlation range ($r$) were used to distribute the population in each survey grid, to represent 1) a clustered population with strong year spatial autocorrelation, 2) a clustered population with weak year spatial autocorrelation, 3) a diffuse population with strong year spatial autocorrelation, and 4) a diffuse population with weak year spatial autocorrelation. In total, twelve different population distribution timeseries simulated to sample (Table \ref{table:distpars}, Figures \ref{fig:dist1} - \ref{fig:dist12}). Age spatial correlation ($\phi_{\xi, age}$) and spatial correlation smoothness ($\lambda$) were held constant across all distributions.
+
+
+### Sampling {-}
+
+Three different sampling designs were evaluated across distributions: 1) systematic, 2) stratified random, 3) stratified systematic. Within the systematic design, every third cell was selected moving rowwise from top to bottom and left to right. The starting cell was randomly selected from the first three cells in the upper left corner. This process resulted in 66-67 selected cells for each year. Stratified random sampling was done by randomly selecting cells within each stratum. For Grid-1 distributions sample sizes by stratum (1 - 3) were 13 cells, 40 cells, and 13 cells, respectively. For Grid-2 distributions sample sizes were 33 cells for both strata and for Grid-3 distributions sample size were 66 cells. Stratified systematic sampling was completed by applying the same systematic samping approach as described above within each stratum. Strata 1 and 3 of Grid-1 distributions were sampled at a rate of every fourth cell, while stratum 2 was sampled at a rate of every other cell. Both strata for Grid-2 distributions were sample at a rate of every third cell, and Grid-3 distributions were not sampled under this design since there is only a single stratum. Sampling was done 100 times for each distribution and sampling design.  
+
+Dredge tows within selected cells were simulated by a binomial sample of the number of individuals at age for that cell in which the probability is a function of the proportion of cell area swept by the dredge and catchability, as in Regular et al. (2020),  
+
+\begin{equation}
+n_{a,y,j} \sim \text{Bin}(N_{a,y,j}, \frac{A_{dredge, j}}{A_{cell}}sq)
+\end{equation}
+
+where  
+
+$n_{a,y,j}$ = the number of individuals caught at cell$j$, of age $a$, in year $y$,  
+$N_{a,y,j}$ = the number of individuals present at cell$j$, of age $a$, in year $y$,  
+$A_{dredge, j}$ = the area swept by the dredge (i.e., length towed multiplied by width, 1.852 x 0.002 = 0.0045),  
+$A_{cell}$ = the area of the cell (i.e., 4),  
+$q$ = catchability.   
+
+Full catchability ($q$ = 1) and selectivity were assumed for all ages. Sizes of individuals caught were simulated using the same von Bertalanffy parameters and error structures as were used to simulate the population.
+
+### Analysis {-}
+
+Estimates of individuals $\geq$ 100 mm and associated CV where computed for each iteration of every sampled distribution, with respect to the design.
+
+\begin{equation}
+\hat{N_{y}} = \sum^{h}_{i = 1}{\bar{U}_{y,i}A_{stratum,i}}
+\end{equation}
+
+\begin{equation}
+\bar{U}_{y,i} = \frac{1}{m_{i}}\sum^{m}_{j = 1}\frac{\sum{n_{y,j}}}{A_{dredge, j}}
+\end{equation}
+
+where  
+
+$\hat{N_{y}}$ = the total estimate of individuals $\geq$ 100 mm in year $y$,  
+$\bar{U}_{y,i}$ = the mean catch-per-unit-effort of year $y$ and stratum $i$,  
+$A_{stratum,i}$ = is the area of stratum $i$,  
+$m_{i}$ = is the number of cells sampled in stratum $i$,    
+$n_{y,j}$ = is the number of individuals $\geq$ 100 mm caught during year $y$, in cell $j$.  
+
+Root mean squared error (RMSE) was estimated by age and size class to compare precision among sample designs for each grid.  Following Regular et al. (2020) RMSE was computed as
+
+\begin{equation}
+\text{RMSE} = \sqrt{\frac{\sum^{L}_{l = 1}\sum^{Y}_{y = 1}\sum^{K}_{k = 1}{(\hat{N}_{l,y,k} - N_{l,y})^2}}{AYK}} 
+\end{equation}
+
+where  
+
+$L$ = the number of ages 0 - 18 or size classes from 20 mm - 200 mm in units of 5 mm,    
+$Y$ = the number of years 1- 20,  
+$K$ = the number of iterations (K = 100),
+$\hat{N}_{l,y,k}$ = estimated abundance of individuals of class $l$, during year $y$, of iteration $k$,  
+$N_{l,y}$ = known abundance of individuals of class $l$, during year $y$.
+
+Interpretation of RMSE is that the survey design with the lowest RMSE is the most suitable for a given distribution.
+
+# Results and Discussion {-} 
+
+Systematic sampling outperformed stratified random and stratified systematic sampling in all distributions, except for Distribution - 1 (Figure \ref{fig:rmse}). It's unclear - and frankly a little suspicious - that stratified systematic sampling typically underestimated abundance in Grid - 1 and Grid - 2 distributions, particularly Grid - 2. This is possibly something to look further in to at a later date. This simulation approach is simple in the sense that the survey areas are rectangular, have a very simple bathymetry, and the covariance in population structure may not truly represent a typical weathervane scallop population (ie real scallop could be even more clustered). However, this does illustrate that without more prior knowledge of the population's distribution, systematic sampling will likely provide a reliable index of abundance.
+
+
+# Tables and Figures {-}
+
+\begin{table}[H]
+\centering
+\caption{Parameters used to simulate a dynamic age- and length-structured population over 20 years.}
+   
+\label{table:poppars}
+\begin{tabular}{p{2cm} p{1.5cm} p{8cm}p{1cm}}
+Process & Parameter & Description & Value\\
+\hline
+Ages & $a$ & Ages in the population & 0 - 18\\
+Years & $y$ & Years to simulate over & 1 - 20\\
+Recruitment & $\mu_{r}$ & Mean log recruitment & log(3$e^{7}$)\\
+& $\sigma_{r}$ & Stdev. of log recruitment & 0.5\\
+Mortality & $\mu_{Z,0-3}$ & Mean log total mortality ages 0 - 3 & log(0.19)\\
+Mortality & $\mu_{Z,4-18}$ & Mean log total mortality ages 4 - 18 & log(0.7)\\
+& $\sigma_{Z}$ & Stdev. of log total mortality & 0.2\\
+& $\phi_{\delta, age}$ & Correlation across ages in error around total mortality & 0.9\\
+& $\phi_{\delta, year}$ & Correlation across years in error around total mortality & 0.5\\
+Growth & $L_{\infty}$ & Mean asymptotic length (i.e. shell height) (mm) & 172.86\\
+& $L_{0}$ & Length (mm) in birth year & 20.7\\
+& $K$ & Growth rate & 0.2\\
+& $\ln\sigma_{L}$ & Log stdev. of LvB growth curve & 0.1\\
+\hline	
+
+\end{tabular} 
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Parameters including age and year spatial correlation, smoothness, and correlation range used to simulate population distributions across survey grids.}
+   
+\label{table:distpars}
+\begin{tabular}{lccccc}
+& Survey & Age Spatial Corr. & Year Spatial Corr. & Smoothness & Corr. range\\
+Distribution & Grid & $\phi_{\xi, age}$ & $\phi_{\xi, year}$ & $\lambda$ & $r$\\
+\hline
+Distribution 1 & 1 & 0.8 & 0.95 & 1 & 300\\
+Distribution 2 & 1 & 0.8 & 0.10 & 1 & 300\\
+Distribution 3 & 1 & 0.8 & 0.95 & 1 & 2,000\\
+Distribution 4 & 1 & 0.8 & 0.10 & 1 & 2,000\\
+Distribution 5 & 2 & 0.8 & 0.95 & 1 & 300\\
+Distribution 6 & 2 & 0.8 & 0.10 & 1 & 300\\
+Distribution 7 & 2 & 0.8 & 0.95 & 1 & 2,000\\
+Distribution 8 & 2 & 0.8 & 0.10 & 1 & 2,000\\
+Distribution 9 & 3 & 0.8 & 0.95 & 1 & 300\\
+Distribution 10 & 3 & 0.8 & 0.10 & 1 & 300\\
+Distribution 11 & 3 & 0.8 & 0.95 & 1 & 2,000\\
+Distribution 12 & 3 & 0.8 & 0.10 & 1 & 2,000\\
+\hline
+\end{tabular} 
+\end{table}
+
+
+
+
+````{r surveygrids, fig.align ='center', fig.cap = "(Top) Survey areas with strata boundaries, colored by depth, and (Bottom) depth profiles of each survey area along the y-axis.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/survey_grids.png")
+``` 
+
+````{r poptrend, fig.align ='center', fig.cap = "Trend in abundance age-4 to age-18 component of the poulation.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/exploitable_animal_timeseries.png")
+``` 
+
+````{r dist1, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 1'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1.png")
+```
+
+````{r dist2, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 2'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2.png")
+```
+
+````{r dist3, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 3'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3.png")
+```
+
+````{r dist4, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 4'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4.png")
+```
+
+````{r dist5, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 5'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5.png")
+```
+
+````{r dist6, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 6'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6.png")
+```
+
+````{r dist7, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 7'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7.png")
+```
+
+````{r dist8, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 8'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8.png")
+```
+
+````{r dist9, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 9'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9.png")
+```
+
+````{r dist10, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 10'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10.png")
+```
+
+````{r dist11, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 11'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11.png")
+```
+
+````{r dist12, fig.align ='center', fig.cap = "Spatial distribution of the exploitable population (ages 4-18) for each year under 'Distribution 12'.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12.png")
+```
+
+````{r depthparab, fig.align ='center', fig.cap = "Probabilty density of population abundance in relation to depth (m) for distributions in (left) Grid - 1 and (right) Grid - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/depth_parabola.png")
+```
+
+````{r rmse, fig.align ='center', fig.cap = "Root mean square error associtated with numbers at age and number at shell height..", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/rmse_result.png")
+```
+
+# Appendix: Systematic Design Result Figures {-}
+
+````{r dist1systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_systematic_N_hat.png")
+```
+
+````{r dist1systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_systematic_N_hat_residuals.png")
+```
+
+````{r dist1systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_systematic_cv.png")
+```
+
+````{r dist1systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist2systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_systematic_N_hat.png")
+```
+
+````{r dist2systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_systematic_N_hat_residuals.png")
+```
+
+````{r dist2systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_systematic_cv.png")
+```
+
+````{r dist2systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist3systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_systematic_N_hat.png")
+```
+
+````{r dist3systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_systematic_N_hat_residuals.png")
+```
+
+````{r dist3systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_systematic_cv.png")
+```
+
+````{r dist3systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist4systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_systematic_N_hat.png")
+```
+
+````{r dist4systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_systematic_N_hat_residuals.png")
+```
+
+````{r dist4systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_systematic_cv.png")
+```
+
+````{r dist4systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist5systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_systematic_N_hat.png")
+```
+
+````{r dist5systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_systematic_N_hat_residuals.png")
+```
+
+````{r dist5systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_systematic_cv.png")
+```
+
+````{r dist5systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist6systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_systematic_N_hat.png")
+```
+
+````{r dist6systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_systematic_N_hat_residuals.png")
+```
+
+````{r dist6systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_systematic_cv.png")
+```
+
+````{r dist6systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_systematic_size_comp_residual.png")
+```
+
+
+````{r dist7systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_systematic_N_hat.png")
+```
+
+````{r dist7systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_systematic_N_hat_residuals.png")
+```
+
+````{r dist7systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_systematic_cv.png")
+```
+
+````{r dist7systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist8systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_systematic_N_hat.png")
+```
+
+````{r dist8systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_systematic_N_hat_residuals.png")
+```
+
+````{r dist8systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_systematic_cv.png")
+```
+
+````{r dist8systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_systematic_size_comp_residual.png")
+```
+
+
+````{r dist9systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_systematic_N_hat.png")
+```
+
+````{r dist9systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_systematic_N_hat_residuals.png")
+```
+
+````{r dist9systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_systematic_cv.png")
+```
+
+````{r dist9systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist10systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_systematic_N_hat.png")
+```
+
+````{r dist10systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_systematic_N_hat_residuals.png")
+```
+
+````{r dist10systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_systematic_cv.png")
+```
+
+````{r dist10systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist11systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_systematic_N_hat.png")
+```
+
+````{r dist11systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_systematic_N_hat_residuals.png")
+```
+
+````{r dist11systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_systematic_cv.png")
+```
+
+````{r dist11systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist12systN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_systematic_N_hat.png")
+```
+
+````{r dist12systNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_systematic_N_hat_residuals.png")
+```
+
+````{r dist12systcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from systematic sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_systematic_cv.png")
+```
+
+````{r dist12systsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from systematic sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_systematic_size_comp_residual.png")
+```
+
+
+
+# Appendix: Stratified Random Design Result Figures {-}
+
+````{r dist1stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_random_N_hat.png")
+```
+
+````{r dist1stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist1stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_random_cv.png")
+```
+
+````{r dist1stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist2stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_random_N_hat.png")
+```
+
+````{r dist2stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist2stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_random_cv.png")
+```
+
+````{r dist2stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist3stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_random_N_hat.png")
+```
+
+````{r dist3stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist3stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_random_cv.png")
+```
+
+````{r dist3stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist4stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_random_N_hat.png")
+```
+
+````{r dist4stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist4stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_random_cv.png")
+```
+
+````{r dist4stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist5stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_random_N_hat.png")
+```
+
+````{r dist5stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist5stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_random_cv.png")
+```
+
+````{r dist5stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist6stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_random_N_hat.png")
+```
+
+````{r dist6stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist6stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_random_cv.png")
+```
+
+````{r dist6stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_random_size_comp_residual.png")
+```
+
+
+````{r dist7stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_random_N_hat.png")
+```
+
+````{r dist7stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist7stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_random_cv.png")
+```
+
+````{r dist7stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist8stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_random_N_hat.png")
+```
+
+````{r dist8stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist8stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_random_cv.png")
+```
+
+````{r dist8stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_random_size_comp_residual.png")
+```
+
+
+````{r dist9stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_stratified_random_N_hat.png")
+```
+
+````{r dist9stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist9stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_stratified_random_cv.png")
+```
+
+````{r dist9stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 9.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist9_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist10stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_stratified_random_N_hat.png")
+```
+
+````{r dist10stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist10stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_stratified_random_cv.png")
+```
+
+````{r dist10stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 10.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist10_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist11stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_stratified_random_N_hat.png")
+```
+
+````{r dist11stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist11stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_stratified_random_cv.png")
+```
+
+````{r dist11stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 11.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist11_stratified_random_size_comp_residual.png")
+```
+
+
+
+````{r dist12stratrandN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_stratified_random_N_hat.png")
+```
+
+````{r dist12stratrandNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_stratified_random_N_hat_residuals.png")
+```
+
+````{r dist12stratrandcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified random sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_stratified_random_cv.png")
+```
+
+````{r dist12stratrandsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified random sampling of Distribution - 12.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist12_stratified_random_size_comp_residual.png")
+```
+
+
+
+# Appendix: Stratified Systematic Design Result Figures {-}
+
+````{r dist1stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_systematic_N_hat.png")
+```
+
+````{r dist1stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist1stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_systematic_cv.png")
+```
+
+````{r dist1stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 1.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist1_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist2stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_systematic_N_hat.png")
+```
+
+````{r dist2stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist2stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_systematic_cv.png")
+```
+
+````{r dist2stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 2.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist2_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist3stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_systematic_N_hat.png")
+```
+
+````{r dist3stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist3stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_systematic_cv.png")
+```
+
+````{r dist3stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 3.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist3_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist4stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_systematic_N_hat.png")
+```
+
+````{r dist4stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist4stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_systematic_cv.png")
+```
+
+````{r dist4stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 4.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist4_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist5stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_systematic_N_hat.png")
+```
+
+````{r dist5stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist5stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_systematic_cv.png")
+```
+
+````{r dist5stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 5.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist5_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist6stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_systematic_N_hat.png")
+```
+
+````{r dist6stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist6stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_systematic_cv.png")
+```
+
+````{r dist6stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 6.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist6_stratified_systematic_size_comp_residual.png")
+```
+
+
+````{r dist7stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_systematic_N_hat.png")
+```
+
+````{r dist7stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist7stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_systematic_cv.png")
+```
+
+````{r dist7stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 7.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist7_stratified_systematic_size_comp_residual.png")
+```
+
+
+
+````{r dist8stratsystN, fig.align ='center', fig.cap = "Timeseries of total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_systematic_N_hat.png")
+```
+
+````{r dist8stratsystNhatreside, fig.align ='center', fig.cap = "Timeseries of residuals on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_systematic_N_hat_residuals.png")
+```
+
+````{r dist8stratsystcv, fig.align ='center', fig.cap = "Timeseries of CV on total abundance estimates ($\\geq$ 100 mm) for each of 100 iterations derived from stratified systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_systematic_cv.png")
+```
+
+````{r dist8stratsystsizecompresid, fig.align ='center', fig.cap = "Timeseries of residuals associated with estimated size composition derived from stratified systematic sampling of Distribution - 8.", eval = T}
+knitr::include_graphics("../../../figures/fishery_independent/survey_design/dist8_stratified_systematic_size_comp_residual.png")
+```

@@ -13,7 +13,7 @@ source("./code/misc/adfg_map_functions.R")
 source("./code/misc/statewide_scallop_survey_functions.R")
 
 ### bed levels
-bed_levels <- c("KSH1", paste0("KNE", 1:6))
+bed_levels <- c("KSH1", paste0("KNE", 1:6), "KAMN")
 
 ### set random number seed
 set.seed(8456)
@@ -38,7 +38,7 @@ logbook <- read.csv("./data/statewide_scallop_survey/logbook/DredgeSurvey_FishLo
 catch_raw <- read.csv("./data/statewide_scallop_survey/catch/DredgeSurvey_CatchData_RegularSurveyHauls.csv") 
 
 ## specimen data
-specimen <- read.csv("./data/statewide_scallop_survey/specimen/DredgeSurvey_ScallopBiologicalData_RegularSurveyHauls.csv")
+specimen <- read.csv("./data/statewide_scallop_survey/specimen/DredgeSurvey_ScallopBioData_RegularSurveyHauls.csv")
 
 ## ctd data
 #ctd <- read.csv("./data/statewide_scallop_survey/survey2101_CTDpH_datasummary.csv", na.strings = "no data")
@@ -48,7 +48,7 @@ specimen <- read.csv("./data/statewide_scallop_survey/specimen/DredgeSurvey_Scal
 ## tows
 tows <- f_clean_log(logbook) 
 catch <- f_catch_by_tow(catch_raw, tows)
-shaw <- f_get_shaw(specimen)
+shaw <- f_get_shaw(specimen, tows)
 shad <- f_get_shad(specimen, catch)
 
 ## edit strata so that YAKB gets the code EK1 for consistency
@@ -60,124 +60,146 @@ strata %>% # strata loaded in custom functions
   summarise(area_nm2 = sum(sq_nmi_alb),
             n_stations = n()) -> bed_area
 
-# # maps of tows ----
-# 
-# ## vessel tracks
-# logbook %>%
-#   filter(haul_type %in% c("10", "Standard"),
-#          tow != 19010054) %>%
-#   dplyr::select(bed_code, stn_id, start_lat, start_lon, end_lat, end_lon) %>%
-#   unite(start_lat, start_lon, col = "start") %>%
-#   unite(end_lat, end_lon, col = "end") %>%
-#   pivot_longer(c(start, end), names_to = "position", values_to = "coords") %>%
-#   separate(col = coords, into = c("y", "x"), sep = "_", convert = T) %>%
-#   mutate(station = ifelse(bed_code == "WK1", 
-#                           paste0(substring(stn_id, 2, 2), " ", substring(stn_id , 3, 4)),
-#                           paste0(substring(stn_id, 2, 3), " ", substring(stn_id , 4, 6)))) %>%
-#   dplyr::select(-bed_code) -> vessel_track
-# 
-# ## grid shapefile
-# f_shp_prep(path = "./data/maps/statewide_scallop_survey_grid", 
-#            layer = "scalGrid2020_standard_wgs84",
-#            fortify = F) %>%
-#   spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> survey_grid
-# 
-# fortify(survey_grid) %>%
-#   full_join(fortify(survey_grid@data), by = "id") %>%
-#   mutate(towed = station %in% vessel_track$station) -> survey_grid
-# 
-# ##KSH and KNE map
-# usa %>%
-#   st_as_sf() %>%
-#   ggplot()+
-#   geom_sf(fill = "grey 60", size = 0.4)+
-#   coord_sf(xlim = c(-154, -151.2), ylim = c(56.6, 58.8))+
-#   ggspatial::annotation_scale(location = "br")+
-#   geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
-#   #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
-#   scale_fill_manual(values = c(NA, "firebrick"))+
-#   labs(x = "Longitude", y = "Latitude")+
-#   theme(legend.position = "none") -> x
-# 
-# ggsave("./figures/fishery_independent/2020/kshkne_dredge_survey_map.png", plot = x,
-#        height = 6, width = 6, units = "in")
-# 
-# ##YAK map
-# usa %>%
-#   st_as_sf() %>%
-#   ggplot()+
-#   geom_sf(fill = "grey 60", size = 0.4)+
-#   coord_sf(xlim = c(-145, -140), ylim = c(59.2, 60.1))+
-#   ggspatial::annotation_scale(location = "br")+
-#   geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
-#   #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
-#   scale_fill_manual(values = c(NA, "firebrick"))+
-#   labs(x = "Longitude", y = "Latitude")+
-#   theme(legend.position = "none") -> x
-# 
-# ggsave("./figures/fishery_independent/2020/yak_dredge_survey_map_a.png", plot = x,
-#        height = 4, width = 6, units = "in")
-# 
-# rbind(usa, can) %>%
-#   st_as_sf() %>%
-#   ggplot()+
-#   geom_sf(fill = "grey 60", size = 0.4)+
-#   coord_sf(xlim = c(-140, -137.5), ylim = c(58.4, 59.5))+
-#   ggspatial::annotation_scale(location = "br")+
-#   geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
-#   #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
-#   scale_fill_manual(values = c(NA, "firebrick"))+
-#   labs(x = "Longitude", y = "Latitude")+
-#   theme(legend.position = "none") -> x
-# 
-# ggsave("./figures/fishery_independent/2020/yak_dredge_survey_map_b.png", plot = x,
-#        height = 4, width = 6, units = "in")
-# 
-# 
-# ## KSH map
-# usa %>%
-#   st_as_sf() %>%
-#   ggplot()+
-#   geom_sf(fill = "grey 60")+
-#   coord_sf(xlim = c(-154.1, -153.2), ylim = c(58.4, 58.8))+
-#   ggspatial::annotation_scale(location = "tl")+
-#   geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
-#   geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
-#   scale_fill_manual(values = c(NA, "grey80"))+
-#   labs(x = "Longitude", y = "Latitude")+
-#   theme(legend.position = "none") -> x
-# 
-# ggsave("./figures/fishery_independent/2020/ksh_dredge_survey_map.png", plot = x,
-#        height = 5, width = 5, units = "in")
-# 
-# ## KNE maps
-# usa %>%
-#   st_as_sf() %>%
-#   ggplot()+
-#   geom_sf(fill = "grey 60")+
-#   coord_sf(xlim = c(-153, -151), ylim = c(56.6, 58.1))+
-#   geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
-#   geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
-#   scale_fill_manual(values = c(NA, "grey80"))+
-#   labs(x = "Longitude", y = "Latitude")+
-#   theme(legend.position = "none") -> x
-# 
-# ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map.png", plot = x,
-#        height = 5, width = 5, units = "in")
-# 
-# x +
-#   ggspatial::annotation_scale(location = "bl")+
-#   coord_sf(xlim = c(-153, -151.7), ylim = c(56.6, 57.4)) -> p1
-# ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map_lower.png", plot = p1,
-#        height = 5, width = 5, units = "in")
-# 
-# x +
-#   ggspatial::annotation_scale(location = "br")+
-#   coord_sf(xlim = c(-152.3, -151), ylim = c(57.2, 58.1)) -> p1
-# ggsave("./figures/fishery_independent/2020/kne_dredge_survey_map_upper.png", plot = p1,
-#        height = 5, width = 5, units = "in")
-# 
-# 
+# maps of tows ----
+
+## vessel tracks
+logbook %>%
+  filter(haul_type == 10,
+         cruise_year == 2022) %>%
+  dplyr::select(bed_code, stn_id, lat_start, lon_start, lat_end, lon_end) %>%
+  unite(lat_start, lon_start, col = "start") %>%
+  unite(lat_end, lon_end, col = "end") %>%
+  pivot_longer(c(start, end), names_to = "position", values_to = "coords") %>%
+  separate(col = coords, into = c("y", "x"), sep = "_", convert = T) %>%
+  mutate(station = ifelse(bed_code %in% c("WK1", "KAMS", "KAMN"), 
+                          paste0(substring(stn_id, 2, 2), " ", substring(stn_id , 3, 4)),
+                          paste0(substring(stn_id, 2, 3), " ", substring(stn_id , 4, 6)))) -> vessel_track
+
+## grid shapefile
+f_shp_prep(path = "./data/maps/statewide_scallop_survey_grid",
+           layer = "scalGrid2020_standard_wgs84",
+           fortify = F) %>%
+  spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> survey_grid
+
+fortify(survey_grid) %>%
+  full_join(fortify(survey_grid@data), by = "id") %>%
+  mutate(towed = station %in% vessel_track$station) -> survey_grid
+
+## district boundaries and area boundaries
+f_shp_prep(path = "./data/maps/mgmt_units",
+           layer = "Scallop_KM_Districts_wgs84",
+           fortify = F) %>%
+  spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> districts_K
+f_shp_prep(path = "./data/maps/mgmt_units",
+           layer = "kamishak_district",
+           fortify = F) %>%
+  spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> districts_H
+
+
+f_shp_prep(path = "./data/maps/mgmt_units",
+           layer = "ScallopAreaBoundaries",
+           fortify = F) %>%
+  spTransform(., CRS("+proj=longlat +datum=WGS84 +no_defs")) -> areas
+
+
+##KSH and KNE map
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-154, -151.2), ylim = c(56.6, 59.5))+
+  ggspatial::annotation_scale(location = "br")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_polygon(data = districts_K, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_polygon(data = districts_H, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_path(data = areas, aes(x = long, y = lat, group = id), size = 1.5)+
+  #geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c("white", "firebrick"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2022/dredge_survey_station_map.png", plot = x,
+       height = 7, width = 7, units = "in")
+
+# inset
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60", size = 0.4)+
+  geom_sf(data = st_as_sf(can), fill = "grey 60", size = 0.4)+
+  coord_sf(xlim = c(-165, -140), ylim = c(54, 65)) -> x
+
+ggsave("./figures/fishery_independent/2022/inset_map.png", plot = x,
+       height = 7, width = 7, units = "in")
+
+## KSH map
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-154.1, -153.2), ylim = c(58.4, 58.8))+
+  ggspatial::annotation_scale(location = "tl")+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_polygon(data = districts_K, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_polygon(data = districts_H, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_path(data = areas, aes(x = long, y = lat, group = id), size = 1.5)+
+  geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c("white", "grey80"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2022/ksh_dredge_survey_map.png", plot = x,
+       height = 5, width = 5, units = "in")
+
+## KNE maps
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  coord_sf(xlim = c(-153, -151), ylim = c(56.6, 58.1))+
+  geom_polygon(data = districts_K, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_polygon(data = districts_H, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_path(data = areas, aes(x = long, y = lat, group = id), size = 1.5)+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c("white", "grey80"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2022/kne_dredge_survey_map.png", plot = x+ggspatial::annotation_scale(location = "bl"),
+       height = 5, width = 5, units = "in")
+
+x +
+  ggspatial::annotation_scale(location = "bl")+
+  coord_sf(xlim = c(-153, -151.7), ylim = c(56.6, 57.4)) -> p1
+ggsave("./figures/fishery_independent/2022/kne_dredge_survey_map_lower.png", plot = p1,
+       height = 5, width = 5, units = "in")
+
+x +
+  ggspatial::annotation_scale(location = "br")+
+  coord_sf(xlim = c(-152.3, -151), ylim = c(57.2, 58.1)) -> p1
+ggsave("./figures/fishery_independent/2022/kne_dredge_survey_map_upper.png", plot = p1,
+       height = 5, width = 5, units = "in")
+
+## KAM maps
+usa %>%
+  st_as_sf() %>%
+  ggplot()+
+  geom_sf(fill = "grey 60")+
+  ggspatial::annotation_scale(location = "bl")+
+  coord_sf(xlim = c(-153.5, -152.5), ylim = c(59, 59.5))+
+  geom_polygon(data = survey_grid, aes(x = long, y = lat, group = group, fill = towed), color = 1)+
+  geom_polygon(data = districts_K, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_polygon(data = districts_H, aes(x = long, y = lat, group = group), fill = NA, color = 1)+
+  geom_path(data = areas, aes(x = long, y = lat, group = id), size = 1.5)+
+  geom_line(data = vessel_track, aes(x = x, y = y, group = stn_id), color = "red", size = 1)+
+  scale_fill_manual(values = c("white", "grey80"))+
+  labs(x = "Longitude", y = "Latitude")+
+  theme(legend.position = "none") -> x
+
+ggsave("./figures/fishery_independent/2022/kamn_dredge_survey_map.png", plot = x,
+       height = 4, width = 4, units = "in")
+
 # # ctd maps ----
 # 
 # ## temperature
@@ -306,10 +328,10 @@ catch %>%
   # add lognormal confience intervals
   mutate(abund_log_l95 = abundance * exp(-1.96 * sqrt(log(1 + cv_abund^2))),
          abund_log_u95 = abundance * exp(1.96 * sqrt(log(1 + cv_abund^2))),
-         abund_ln_ci = paste0("[", round(abund_log_l95, 0), ", ", round(abund_log_u95, 0), "]"),
+         abund_ln_ci = paste0("[", prettyNum(round(abund_log_l95), ","), "; ", prettyNum(round(abund_log_u95), ","), "]"),
          biomass_log_l95 = biomass * exp(-1.96 * sqrt(log(1 + cv_biomass^2))),
          biomass_log_u95 = biomass * exp(1.96 * sqrt(log(1 + cv_biomass^2))),
-         biomass_ln_ci = paste0("[", round(biomass_log_l95, 0), ", ", round(biomass_log_u95, 0), "]")) %>%
+         biomass_ln_ci = paste0("[", prettyNum(round(biomass_log_l95), ","), "; ", prettyNum(round(biomass_log_u95), ","), "]")) %>%
   ungroup -> abundance_biomass
 
 ## print output table
@@ -404,7 +426,7 @@ shaw %>%
   mutate(cv = sqrt(var_mw_biomass) / mw_biomass, 
          ln_l95 = mw_biomass * exp(-1.96 * sqrt(log(1 + cv^2))),
          ln_u95 = mw_biomass * exp(1.96 * sqrt(log(1 + cv^2))),
-         ln_ci = paste0("[", round(ln_l95, 0), ", ", round(ln_u95, 0), "]")) %>%
+         ln_ci = paste0("[", prettyNum(round(ln_l95), ","), "; ", prettyNum(round(ln_u95), ","), "]")) %>%
   # rearrange rows
   arrange(year, district, bed_name) %>%
   ungroup -> mw_biomass
@@ -459,7 +481,7 @@ shaw %>%
             cv = sqrt(var_mw_biomass) / mw_biomass,
             ln_l95 = mw_biomass * exp(-1.96 * sqrt(log(1 + cv^2))),
             ln_u95 = mw_biomass * exp(1.96 * sqrt(log(1 + cv^2))),
-            ln_ci = paste0("[", round(ln_l95, 0), ", ", round(ln_u95, 0), "]")) -> mw_biomass_calc
+            ln_ci = paste0("[", prettyNum(round(ln_l95), ","), ", ", prettyNum(round(ln_u95), ","), "]")) -> mw_biomass_calc
 
 mw_biomass_calc %>%
   ## print output table
@@ -497,6 +519,46 @@ ggsave("./figures/fishery_independent/2022/KNE_dredge_survey_size_comp_count.png
 ggsave("./figures/fishery_independent/2022/KAM_dredge_survey_size_comp_count.png", 
        plot = sh_plots$sh_plot[[3]], width = 5, height = 6, units = "in")
 
+# size comp pmf
+shad %>%
+  filter(tow %in% tows$tow,
+         !(bed_name %in% c("KSH2", "KSH3"))) %>%
+  mutate(dist = district) %>%
+  group_by(dist) %>%
+  nest() %>% 
+  filter(dist %in% c("KAM", "KSH", "KNE"))  %>%
+  mutate(size_comp = purrr::map(data, function(data) {
+    # size comp
+    data %>%
+      group_by(year, bed_name) %>%
+      mutate(total = sum(sample_factor),
+             prop = sample_factor / total,
+             nmeas = n()) %>%
+      group_by(year, shell_height, bed_name, nmeas) %>%
+      summarise(prop = sum(prop),
+                count = sum(sample_factor)) %>% ungroup %>%
+      right_join(expand_grid(year = unique(.$year),
+                             shell_height = 0:200,
+                             bed_name = unique(.$bed_name))) %>%
+      replace_na(list(prop = 0, count = 0)) %>%
+      group_by(year, bed_name) %>% mutate(nmeas = mean(nmeas, na.rm = T)) -> out
+    return(out)
+  })) %>%
+  dplyr::select(-data) %>%
+  unnest(size_comp) %>%
+  write_csv("./output/fishery_independent/statewide_scallop_survey/2022/2022_size_comp_pmf.csv")
+
+
+# age distribution ----
+
+shaw %>%
+  filter(!is.na(age),
+         age > 0) %>%
+  group_by(year, district, bed_name, shell_height, age) %>%
+  
+  summarise(count = n()) %>%
+  write_csv("./output/fishery_independent/statewide_scallop_survey/2022/2022_conditional_age_comp.csv")
+  
 # meat weight ~ shell height ----
 
 shaw  %>%
@@ -555,7 +617,7 @@ shaw %>%
   geom_point(aes(x = whole_wt, y = meat_wt, color = factor(year)), alpha = 0.1)+
   geom_smooth(aes(x = whole_wt, y = meat_wt, color = factor(year)), method = "gam", se = F)+
   geom_line(aes(x = whole_wt, y = whole_wt * 0.1), linetype = 2)+
-  scale_color_manual(values = cb_palette[1:5])+
+  scale_color_manual(values = cb_palette[1:6])+
   facet_wrap(~district_full, scales = "free", nrow = 1)+
   labs(x = "Round Weight (g)", y = "Meat Weight (g)", color = NULL) -> x
 
@@ -741,30 +803,33 @@ ggsave("./figures/fishery_independent/2022/gonad_at_size.png", plot = x,
 
 
 
-# # weight at size ----
-# 
-# f_wl <- function(data) {
-#   sh = data$shell_height/10
-#   wt = data$whole_wt/1000
-#   
-#   fit = lm(log(wt) ~ log(sh))
-#   coef = coef(fit)
-#   #coef[1] = exp(coef[1] + sqrt(diag(vcov(fit)))[1] / 2)
-#   
-#   return(coef)
-# }
-# 
-# shaw %>%
-#   group_by(district) %>%
-#   nest() %>%
-#   mutate(par = purrr::map(data, f_wl)) -> wl_fit
-# 
-# ## extract KSH
-# wl_fit %>%
-#   #filter(district == "KSH") %>%
-#   dplyr::select(district, par) %>%
-#   unnest(par)
-# 
+# weight at size ----
+
+f_wl <- function(data) {
+  sh = data$shell_height/10
+  wt = data$whole_wt/1000
+
+  fit = lm(log(wt) ~ log(sh))
+  coef = coef(fit)
+  coef[1] = exp(coef[1] + sqrt(diag(vcov(fit)))[1] / 2)
+
+  return(coef)
+}
+
+shaw %>%
+  group_by(district) %>%
+  nest() %>%
+  mutate(par = purrr::map(data, f_wl)) -> wl_fit
+
+## extract KSH
+wl_fit %>%
+  filter(district == "KSH") %>%
+  dplyr::select(district, par) %>%
+  unnest(par) -> wal_par
+# print output table
+write_csv(wal_par, "./output/fishery_independent/statewide_scallop_survey/2022/wal_par.csv")
+
+
 # # plot for 2022 SPT presentation on SS models
 # shaw %>%
 #   filter(district == "KSH") %>%
@@ -772,16 +837,29 @@ ggsave("./figures/fishery_independent/2022/gonad_at_size.png", plot = x,
 #   geom_point(aes(x = shell_height/10, y = whole_wt/1000), color = "lightgrey", alpha = 0.2)+
 #   # ksh fit
 #   geom_line(aes(x = shell_height/10, y = 0.000148*(shell_height/10)^2.79))+
-#   # kam fit 
+#   # kam fit
 #   geom_line(aes(x = shell_height/10, y = 0.000143*(shell_height/10)^2.873), color = "red")+
 #   labs(x = "Shell Height(cm)", y = "Round Weight (kg)") -> x
 # 
-# ggsave("./figures/fishery_independent/2021/2021_wt_at_sh.png", plot = x, 
+# ggsave("./figures/fishery_independent/2021/2021_wt_at_sh.png", plot = x,
 #        height = 3, width = 5, units = "in")
+
+
+
+
 # 
 # 
 # 
-# 
-# 
-# 
-# 
+
+# mean size at age ----
+
+shaw %>%
+  filter(!is.na(age)) %>%
+  group_by(year, bed_name, age) %>%
+  summarise(sh = mean(shell_height, na.rm = T),
+            n = n()) %>%
+  write_csv("./output/fishery_independent/statewide_scallop_survey/2022/mean_size_at_age.csv")
+
+
+
+

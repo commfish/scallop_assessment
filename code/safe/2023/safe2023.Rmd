@@ -1,0 +1,431 @@
+---
+# title: "Stock Assessment and Fishery Evaluation Report for the Scallop Fishery Off Alaska"
+# author: |
+#   | Scallop Plan Team 
+#   | Tyler Jackson$^{1}$, Scott Miller$^{2}$, Sarah Rheinsmith$^{3}$
+#   |
+#   | $^1$Alaska Department of Fish and Game, tyler.jackson@alaska.gov
+#   | $^2$National Marine Fisheries Service, scott.miller@noaa.gov
+#   | $^3$North Pacific Fisheries Management Council, sarah.rheinsmith@noaa.gov
+# date: "`r format(Sys.time(), '%B %Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: no
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(xtable)
+options(scipen = 999)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+
+f_area_sdr <- function(data) {
+  
+  if("reg_area" %in% names(data)) {
+    data %>% 
+      mutate(reg_area_text = case_when(reg_area == "K" ~ "Kodiak",
+                                       reg_area %in% c("D", "YAK") ~ "Yakutat",
+                                       reg_area == "M" ~ "AK Peninsula",
+                                       district %in% c("UB", "C", "WC", "M") ~ "AK Peninsula",
+                                       reg_area == "O" ~ "Ducth Harbor",
+                                       reg_area == "Q" ~ "Bering Sea",
+                                       reg_area == "E" ~ "Prince William Sound",
+                                       reg_area == "H" ~ "Cook Inlet")) -> y
+  }
+  if(!("reg_area" %in% names(data))) {
+    data %>% 
+      mutate(reg_area_text = case_when(substring(district, 1, 1) == "K" ~ "Kodiak",
+                              district == "YAK" ~ "Yakutat",
+                              district %in% c("UB", "C", "WC", "M") ~ "AK Peninsula",
+                              district == "O" ~ "Dutch Harbor",
+                              district == "Q" ~ "Bering Sea",
+                              district %in% c("WKI", "EKI") ~ "Prince William Sound",
+                              district %in% c("KAM") ~ "Cook Inlet")) -> y
+  }
+  y %>%
+    mutate(district_text = case_when(district == "KNE" ~ "Northeast",
+                                   district == "KSH" ~ "Shelikof",
+                                   district == "KSW" ~ "Southwest",
+                                   district == "KSE" ~ "Southeast",
+                                   district == "KSEM" ~ "Semidi",
+                                   district == "KAM" ~ "Kamishak",
+                                   district == "C" ~ "Central",
+                                   district == "WC" ~ "West Chignik",
+                                   district == "UB" ~ "Unimak Bight",
+                                   district == "O" ~ "Dutch Harbor",
+                                   district == "Q" ~ "Bering Sea",
+                                   district %in% c("D", "D16", "YAK") ~ "Yakutat",
+                                   district == "EKI" ~ "East Kayak Island",
+                                   district == "WKI" ~ "West Kayak Island",
+                                   district == "M" ~ "AK Peninsula"),
+           reg_area_text = factor(reg_area_text, levels = c("Yakutat", "Prince William Sound", "Cook Inlet", "Kodiak", "AK Peninsula", "Dutch Harbor", "Bering Sea")),
+           district_text = factor(district_text, levels = c("Yakutat", "East Kayak Island", "West Kayak Island", "Kamishak", "Northeast", "Shelikof", "Southwest", "Southeast", "Semidi", "West Chignik", "Central", "Unimak Bight", "AK Peninsula",  "Dutch Harbor", "Bering Sea"))) -> out
+  
+  return(out)
+  
+}
+
+```
+
+<!-- tile page -->
+
+\newgeometry{left=1mm,right=1mm,bottom=1mm,top=1mm}
+```{r out.width= "100%", eval = T}
+knitr::include_graphics("../../../figures/safe/2023/title_page_2023.png")
+```
+
+\newgeometry{left=1in,right=1in,bottom=1in,top=1in}
+\setcounter{page}{1}
+
+<!-- end title page --> 
+
+```{r loadfisherydata}
+# load fishery related data
+
+## ghl 
+ghl <- read_csv("../../../data/observer/metadata/ghl_revised_timeseries.csv")
+
+## retained catch information
+tibble(district = str_match(list.files("../../../output/observer/2023", "fish_stats", full.names = T), "stats_*(.*?)\\s*.csv")[,2],
+       fish_stats = purrr::map(list.files("../../../output/observer/2023", "fish_stats", full.names = T), read_csv)) %>%
+  unnest(fish_stats) -> fish_stats
+
+## discard information
+tibble(district = str_match(list.files("../../../output/observer/2023", "discard", full.names = T), "discard_summary_*(.*?)\\s*.csv")[,2],
+       discards = purrr::map(list.files("../../../output/observer/2023", "discard", full.names = T), read_csv)) %>%
+  unnest(discards) -> discards
+
+## pre-2008 fishery removals
+pre_removals <- read_csv("../../../data/observer/old_catch/total_removals_1993_2008.csv")
+```
+
+```{r fishinfo}
+# total fishery removals
+fish_stats %>%
+  # remove redundant data
+  filter(district != "M") %>%
+  group_by(season) %>%
+  summarise(mt_wt = sum(mt_wt, na.rm = T)) %>%
+  # join to discard summary
+  left_join(discards %>%
+              # remove redundant data
+              filter(district != "M") %>%
+              # season total
+              group_by(season) %>%
+              summarise(disc_mt_wt = sum(discard_M_lbs, na.rm = T) * 0.1)) %>%
+  # compute total removals
+  transmute(season = season, 
+            tot_removal = mt_wt + disc_mt_wt,
+            ofl = ifelse(substring(season, 1, 4) <= 2010, 1.24e6, 1.284e6),
+            abc = ifelse(substring(season, 1, 4) <= 2010, 1.116e6, 1.156e6)) %>%
+  # bind to pre-observer timeseries
+  bind_rows(pre_removals) %>% arrange(season) %>%
+  # compute percentages
+  mutate(percent_ofl = tot_removal / ofl * 100,
+         percent_abc = tot_removal / abc * 100) -> removals_tab
+
+# recent fishery removals and ghl
+AKS21_removals_lb <- filter(removals_tab, season == "2021/22") %>% pull(tot_removal)
+AKS21_removals_t <- AKS21_removals_lb * 0.000453592
+AKS22_removals_lb <- filter(removals_tab, season == "2022/23") %>% pull(tot_removal)
+AKS22_removals_t <- AKS22_removals_lb * 0.000453592
+AKS21_ghl_lb <- filter(ghl, season == "2021/22") %>% pull(ghl) %>% sum(., na.rm = T)
+AKS21_ghl_t <- AKS21_ghl_lb * 0.000453592
+AKS22_ghl_lb <- filter(ghl, season == "2022/23") %>% pull(ghl) %>% sum(., na.rm = T)
+AKS22_ghl_t <- AKS22_ghl_lb * 0.000453592
+AKS21_ret_lb <- filter(fish_stats, season == "2021/22", district != "M") %>% pull(mt_wt) %>% sum
+AKS21_ret_t <- AKS21_ret_lb * 0.000453592
+AKS21_disc_lb <- filter(discards, season == "2021/22", district != "M") %>% pull(discard_lb) %>% sum(.,na.rm = T) * 0.2 * 0.1
+AKS21_disc_t <- AKS21_disc_lb * 0.000453592
+AKS22_ret_lb <- filter(fish_stats, season == "2022/23", district != "M") %>% pull(mt_wt) %>% sum
+AKS22_ret_t <- AKS22_ret_lb * 0.000453592
+AKS22_disc_lb <- filter(discards, season == "2022/23", district != "M") %>% pull(discard_lb) %>% sum(.,na.rm = T) * 0.2 * 0.1
+AKS22_disc_t <- AKS22_disc_lb * 0.000453592
+AKS21_cpue_range <- filter(fish_stats, season == "2021/22", district != "M") %>% pull(mw_cpue) %>% range(na.rm = T)
+AKS22_cpue_range <- filter(fish_stats, season == "2022/23", district != "M") %>% pull(mw_cpue) %>% range(na.rm = T)
+```
+
+
+# Executive Summary {-}
+
+\begin{enumerate}
+
+\item \textbf{Stock}: Weathervane scallop, $Patinopecten$ $caurinus$, in waters off Alaska. Status of other Alaska scallop stocks are detailed in the Ecosystem Component in the most recent SAFE document (SPT 2022).
+
+\item \textbf{New information}: 
+
+\begin{itemize}
+
+\item 2021/22 - 2022/23 fishery retained catch;
+\item 2021/22 - 2022/23 fishery discards and discard mortality;
+\item 2021/22 - 2022/23 fishery CPUE;
+\item 2022 fishery-independent dredge survey results.
+
+\end{itemize}
+
+\item \textbf{Fishery performance}: The 2021/22 season statewide Guideline Harvest Level (GHL) for weathervane scallops was `r prettyNum(round(AKS21_ghl_lb), ",")` lb (`r prettyNum(round(AKS21_ghl_t, 1), ",")` t) of shucked meats. Of this GHL, `r prettyNum(round(AKS21_ret_lb), ",")` lb (`r prettyNum(round(AKS21_ret_t, 1), ",")` t) were retained  with an additional `r prettyNum(round(AKS21_disc_lb), ",")` lb (`r prettyNum(round(AKS21_disc_t, 1), ",")` t) of estimated discard mortality for a total take of `r prettyNum(round(AKS21_removals_lb), ",")` lb (`r prettyNum(round(AKS21_removals_t, 1), ",")` t) of shucked meats (Table \ref{table:fishery21}). Nominal meat weight catch-per-unit-effort (CPUE) ranged from `r round(AKS21_cpue_range[1], 1)` lb/dredge hr to `r round(AKS21_cpue_range[2], 1)` lb/dredge hr among districts (Table \ref{table:fishery21}).
+
+The 2022/23 season statewide GHL increased to `r prettyNum(round(AKS22_ghl_lb), ",")` lb (`r prettyNum(round(AKS22_ghl_t, 1), ",")` t) due to increases in Kodiak Northeast and Kodiak Shelikof Districts (Table \ref{table:fishery22}). Retained catch totaled `r prettyNum(round(AKS22_ret_lb), ",")` lb (`r prettyNum(round(AKS22_ret_t, 1), ",")` t) of shucked meats. GHLs were met in all districts fished except Yakutat and Dutch Harbor, while Kodiak Southeast and waters between 160$^{\circ}$W - 161$^{\circ}$W longitude (Area M) were left unfished. Statewide discard mortality was estimated to be `r prettyNum(round(AKS22_ret_lb), ",")` lb (`r prettyNum(round(AKS22_ret_t, 1), ",")` t), yielding a total removal of `r prettyNum(round(AKS22_removals_lb), ",")` lb (`r prettyNum(round(AKS22_removals_t, 1), ",")` t) of shucked meats (Table \ref{table:fishery22}). Nominal meat weight CPUE ranged from `r round(AKS22_cpue_range[1], 1)` lb/dredge hr to `r round(AKS22_cpue_range[2], 1)` lb/dredge hr among districts (Table \ref{table:fishery22}).
+
+\item \textbf{Stock status}: Status of the weathervane scallop stock relative to "overfished" is \textbf{"unknown"}. The FMP defines the minimum stock size threshold (MSST) for weathervane scallops as 4.93 million lbs (2,236 t) of shucked scallop meats. However, scallop abundance is estimated only for portions of two of nine registration areas, thus there is no biomass estimate of the full stock. This status determination is not considered to be a conservation concern since scallops are distributed in many areas that have been closed to fishing to protect crab populations and in areas not defined as commercial scallop beds.   
+ 
+Estimated total fishing removals (retained and discarded) for the 2021/22 and 2022/23 seasons were `r prettyNum(round(AKS21_removals_lb), ",")` lb (`r prettyNum(round(AKS21_removals_t, 1), ",")` t) and `r prettyNum(round(AKS22_removals_lb), ",")` lb (`r prettyNum(round(AKS22_removals_t, 1), ",")` t) of shucked meats, respectively (Table \ref{table:totalremovals}). These estimates are less than 30\% of the ABC/ACL and OFL, therefore, \textbf{overfishing did not occur in 2021/22 or 2022/23}.   
+
+\item \textbf{Scallop Plan Team Harvest Recommendations}: The Scallop Plan Team recommends that OFL in the 2023/24 season be set equal to maximum OY (1.284 million lb; 582 t) as defined in the Scallop FMP (2014). The Team also recommends that ABC for scallops in 2023/24 be set consistent with the maximum ABC control rule (90\% of OFL) and which is equal to 1.156 million lb (524 t).
+
+\item \textbf{Fishery Independent Survey}: The Alaska Department of Fish and Game (ADF\&G) conducted a dredge survey in 2022 of weathervane scallop beds within the Northeast and Shelikof Districts of the Kodiak Registration Area, and the Kamishak District of the Cook Inlet Registration Area. Abundance and round weight biomass of exploitable-sized scallops ($\geq$ 100 mm shell height) increased from previous surveys in all districts. Trends in meat weight biomass followed abundance and round weight biomass in all beds, except within Kamishak District, which was likely due to sampling error (Table \ref{table:surveylarge}). Abundance and round weight biomass of scallops smaller than 100 mm shell height also increased among all districts (Table \ref{table:surveysmall}). Further details of the 2022 ADF\&G scallop dredge survey can be found in Jackson et al. ($in$ $review$).
+
+\end{enumerate}
+
+
+# Tables {-}
+
+\begin{table}[H]
+\centering
+\caption{Total Alaska weathervane scallop removals (landings + discards) and OY/MSY/OFL, 1993/94 – 2022/23 seasons.}
+\label{table:totalremovals}
+\begin{tabular}{llcccccc}
+& Total Removals & OFL & ABC & & \\
+Season & (lb meats) & (lb meats) & (lb meats) & \% OFL & \% ABC \\
+\hline
+```{r totalremovals, results='asis', eval = T}
+# print table
+print(xtable(removals_tab, align="llccccc", digits=c(0, 0, 0, 0, 0, 1, 1)),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Guidline harvest Levels (GHL) and summary statistics (lb meat weight) from the 2021/22 Alaska weathervane scallop fishery.}
+\label{table:fishery21}
+\begin{tabular}{llccccc}
+Registration & District/ Subsection & GHL & Retained & CPUE & Discard\\
+Area & Subsection & (lb) & (lb) & (lb / dredge hr) & Mortality (lb)\\
+\hline
+```{r fishery21, results='asis', eval = T}
+
+fish_stats %>%
+  # join to discards
+  left_join(discards) %>%
+  replace_na(list(discard_lb = 0)) %>%
+  # filter for season
+  filter(season == "2021/22", !(district %in% c("KSEM", "M"))) %>%
+  # create text columns
+  f_area_sdr() %>%
+  # format table
+  arrange(district_text) %>%
+  transmute(reg_area_text = c("Yakutat", "Prince William Sound", NA, "Kodiak", NA, NA, NA, "AK Peninsula", NA, "Dutch Harbor", "Bering Sea"),
+            district_text, 
+            ghl = ifelse(ghl > 0, prettyNum(ghl, ","), "Closed"), 
+            ret = ifelse(mt_wt + discard_lb == 0, "No Effort", prettyNum(round(mt_wt), ",")),
+            ret = ifelse(ghl == "Closed", NA, ret),
+            mw_cpue = ifelse(mt_wt > 0, round(mw_cpue, 1), NA),
+            disc_M = ifelse(mt_wt + discard_lb == 0, "No Effort", prettyNum(round(discard_lb * 0.2 * 0.1), ",")),
+            disc_M  = ifelse(ghl == "Closed", NA, disc_M )) -> tab
+
+# print table
+print(xtable(tab, align="llccccc"),booktabs = TRUE,
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+```{r fishery21total, results='asis', eval = T}
+
+fish_stats %>%
+  # join to discards
+  left_join(discards) %>%
+  replace_na(list(discard_lb = 0)) %>%
+  # filter for season
+  filter(season == "2021/22", !(district %in% c("KSEM", "M"))) %>%
+  summarise(reg_area_text = "Statewide Total",
+            district_area_text = NA,
+            ghl = prettyNum(sum(ghl), ","),
+            ret = prettyNum(round(sum(mt_wt, na.rm = T)), ","), 
+            cpue = prettyNum(round(sum(mt_wt, na.rm = T) / sum(dredge_hrs, na.rm = T), 1), ","),
+            disc_M = prettyNum(round(sum(discard_lb, na.rm = T) * 0.2 * 0.1), ",")) -> total
+  
+
+# print table
+print(xtable(total, align="llccccc"),booktabs = TRUE,
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]
+\centering
+\caption{Guidline harvest Levels (GHL) and summary statistics (lb meat weight) from the 2022/23 Alaska weathervane scallop fishery.}
+\label{table:fishery22}
+\begin{tabular}{llccccc}
+Registration & District / Subsection & GHL & Retained & CPUE & Discard\\
+Area & Subsection & (lb) & (lb) & (lb / dredge hr) & Mortality (lb)\\
+\hline
+```{r fishery22, results='asis', eval = T}
+
+fish_stats %>%
+  # join to discards
+  left_join(discards) %>%
+  replace_na(list(discard_lb = 0)) %>%
+  # filter for season
+  filter(season == "2022/23", !(district %in% c("KSEM", "M"))) %>%
+  # create text columns
+  f_area_sdr() %>%
+  # format table
+  arrange(district_text) %>%
+  transmute(reg_area_text = c("Yakutat", "Prince William Sound", NA, "Kodiak", NA, NA, NA, "AK Peninsula", NA, "Dutch Harbor", "Bering Sea"),
+            district_text, 
+            ghl = ifelse(ghl > 0, prettyNum(ghl, ","), "Closed"), 
+            ret = ifelse(mt_wt + discard_lb == 0, "No Effort", prettyNum(round(mt_wt), ",")),
+            ret = ifelse(ghl == "Closed", NA, ret),
+            mw_cpue = ifelse(mt_wt > 0, round(mw_cpue, 1), NA),
+            disc_M = ifelse(mt_wt + discard_lb == 0, "No Effort", prettyNum(round(discard_lb * 0.2 * 0.1), ",")),
+            disc_M  = ifelse(ghl == "Closed", NA, disc_M )) -> tab
+
+# print table
+print(xtable(tab, align="llccccc"),booktabs = TRUE,
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+```{r fishery22total, results='asis', eval = T}
+
+fish_stats %>%
+  # join to discards
+  left_join(discards) %>%
+  replace_na(list(discard_lb = 0)) %>%
+  # filter for season
+  filter(season == "2022/23", !(district %in% c("KSEM", "M"))) %>%
+  summarise(reg_area_text = "Statewide Total",
+            district_area_text = NA,
+            ghl = prettyNum(sum(ghl), ","),
+            ret = prettyNum(round(sum(mt_wt, na.rm = T)), ","), 
+            cpue = prettyNum(round(sum(mt_wt, na.rm = T) / sum(dredge_hrs, na.rm = T), 1), ","),
+            disc_M = prettyNum(round(sum(discard_lb, na.rm = T) * 0.2 * 0.1), ",")) -> total
+  
+
+# print table
+print(xtable(total, align="llccccc"),booktabs = TRUE,
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+
+\end{tabular}
+\end{table}
+
+
+
+
+\begin{table}[H]
+\centering
+\caption{Estimated abundance ($N$), round biomass (lb), meat biomass (lb) and associated CVs of scallops $\geq$ 100 mm shell height by bed, from the 2022 ADF\&G Dredge Survey.}
+\label{table:surveylarge}
+\begin{tabular}{llccccccc}
+& & \multicolumn{2}{c}{Abundance} & \multicolumn{2}{c}{Round Biomass} & \multicolumn{2}{c}{Meat Biomass}\\
+District & Bed & $N$ & CV & lb & CV & lb & CV\\
+\hline
+```{r surveylarge, results='asis', eval = T}
+read_csv("../../../output/fishery_independent/statewide_scallop_survey/2022/2022_abundance_rnd_biomass_by_bed.csv") %>%
+  left_join(read_csv("../../../output/fishery_independent/statewide_scallop_survey/2022/2022_mw_biomass_by_bed.csv")) %>%
+  filter(samp_grp == 1, year == 2022) %>%
+  f_area_sdr() %>%
+  arrange(district_text) %>%
+  transmute(district_text = c("Kamishak", "Kodiak Northeast", rep(NA, 4), "Kodiak Shelikof"),
+            bed_name,
+            abund = prettyNum(round(abundance), ","),
+            cv_abund = round(cv_abund, 2),
+            rnd_biomass = prettyNum(round(biomass), ","),
+            cv_rnd = round(cv_biomass, 2),
+            mw_biomass = prettyNum(round(mw_biomass), ","),
+            cv_mw = round(cv, 2)) -> survey_res_large
+
+
+# print table
+print(xtable(survey_res_large, align="llccccccc"),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]
+\centering
+\caption{Estimated abundance ($N$), round biomass (lb),  and associated CVs of scallops < 100 mm by bed, from the 2022 ADF\&G Dredge Survey.}
+\label{table:surveysmall}
+\begin{tabular}{llccccc}
+& & \multicolumn{2}{c}{Abundance} & \multicolumn{2}{c}{Round Biomass}\\
+District & Bed & $N$ & CV & lb & CV \\
+\hline
+```{r surveysmall, results='asis', eval = T}
+read_csv("../../../output/fishery_independent/statewide_scallop_survey/2022/2022_abundance_rnd_biomass_by_bed.csv") %>%
+  filter(samp_grp == 2, year == 2022) %>%
+  f_area_sdr() %>%
+  arrange(district_text) %>%
+  transmute(district_text = c("Kamishak", "Kodiak Northeast", rep(NA, 4), "Kodiak Shelikof"),
+            bed_name,
+            abund = prettyNum(round(abundance), ","),
+            cv_abund = round(cv_abund, 2),
+            rnd_biomass = prettyNum(round(biomass), ","),
+            cv_rnd = round(cv_biomass, 2)) -> survey_res_small
+
+
+# print table
+print(xtable(survey_res_small, align="llccccc"),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+

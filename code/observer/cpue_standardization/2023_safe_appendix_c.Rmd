@@ -1,0 +1,283 @@
+---
+title: "Appendix C: Scallop Fishery Catch per Unit Effort Index Standardization"
+author: |
+  | Tyler Jackson
+  | Alaska Department of Fish and Game, tyler.jackson@alaska.gov
+date: "`r format(Sys.time(), '%B %Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: no
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+```{r, echo = F, message = F, warning = F, results = F}
+library(xtable)
+library(patchwork)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+
+# cpue standardization R script
+source("./std.R")
+```
+
+# Purpose {-}
+
+This appendix documents progress in developing a standardized catch per unit effort (CPUE) index based on fishery observer data. This index is used in development of a Stock Synthesis population dynamics model for the Kodiak Shelikof District.
+
+# Background {-}
+
+Interpretation of catch per unit effort (CPUE) as an index of abundance is reliant upon a fundamental relationship in fisheries analysis
+
+\begin{equation}
+U_{t}=\frac{C_{t}}{E_{t}}=qN_{t}
+\end{equation}
+
+where $C_t$ is catch at time $t$, $E_t$ is the effort expended at time $t$, $N_t$ is abundance at time $t$, and $q$ is the portion of the stock captured by one unit of effort (Maunder and Punt 2004; Maunder et al., 2006). Provided $q$ is constant over time, CPUE is proportional to abundance, though it is rare that $q$ is constant over the entire exploitation history. 
+
+Weathervane scallop CPUE is affected by each vessel's choice of fishing location as well as weather, currents, sea state, captain and crew performance, gear tuning, processing capacity, markets, etc. Standardization of scallop fishery CPUE has been explored in various forms since 2017 (NPFMC 2017). Most recently, a standardized CPUE index was estimated using a generalized additive model (GAM) with gamma distributed error and log link function in the form of 
+
+\begin{equation}
+(U + \gamma) = f_1(depth~\cdot~Bed) + f_2(longitude\cdot~Bed) + Month + Vessel + Bed + Season + \epsilon
+\end{equation}
+
+where $f_i$ are smoothing functions, and month, vessel, bed, and season are parametric effects. Since all fishery hauls were used (i.e., including zero catching and unobserved hauls), a small modifier ($\gamma$) was added to CPUE estimates to avoid zero values. The resulting standardized index in season $i$ was computed as the marginal of season $i$ ($\beta_{j,i}$), back-transformed using
+
+\begin{equation}
+\hat{U_{i}} = e^{\beta_{j,i} + \frac{\sigma_{j,i}}{2}} - \gamma
+\end{equation}
+
+where ($\beta_{j,i}$) and $\sigma_{j,i}$ are the point estimate and standard error of the $j^{th}$ parametric effect (i.e., season) in year $i$ (NPFMC 2022).
+
+This appendix continues efforts to improve development of a standardized CPUE index following Siddeek et al. (2016). Differences from the previous method include 1) the covariate structure, 2) method for fitting non-linear terms, and 3) data used in the analysis.
+
+
+# Core data preparation {-}
+
+There is no minimum legal size for weathervane scallops, and thus retention size is dependent on various factors including vessel, captain, population composition, GHL, and fishery performance, etc. Prior efforts to standardize observer CPUE has only considered retained catch CPUE, partly because such analyses used data from both observed and unobserved hauls. Here, standardized indices for both retained catch and total catch (i.e., retained + discards) CPUE are estimated.
+
+Prior to fitting linear models, observer data were filtered to exclude data not representative of core fishery performance, and therefore abundance. Although catch estimates exist for all commercial dredges since 2009, only observed dredges were included in this analysis. In addition, only dredges started within known scallop bed boundaries were included. There is no regulation specifying a standard dredge width, but paired 13 ft or 15 ft dredges are used by the fleet during the vast majority of the timeseries, therefore only hauls employing those dredge sizes were included in this analysis. Anomalously low (including zero) and high catches were removed from analyses by including only the 2.5$\%$ - 97.5$\%$ quantiles of CPUE data. Likewise, only dredges within the 2.5$\%$ - 97.5$\%$ quantiles of depth were included. Total sample sizes per season are listed in (Table \ref{table:samplesize}).  
+
+# Standardization by General Linear Model {-}
+
+Standardized CPUE $\hat{U}_{i}$ was estimated using a generalized linear model (GLM) evaluating a range of covariates including depth, month, dredge width, vessel, bed, and season. Since the exact functional relationship between depth and CPUE is unknown, the effect of depth was estimated as a natural spline with 4 degrees of freedom. Appropriate degrees of freedom were evaluated using AIC. The key point of difference between this approach and using a GAM is that degrees of freedom are fixed in a natural spline within GLM, whereas they would be estimated using a penalized maximum likelihood in a GAM.
+
+Forward and backward, stepwise model selection was done with the 'null' model containing only a single explanatory variable (i.e., Season),
+
+\begin{equation}
+\text{ln}\hat{U}_{i} = Season_{i}+\epsilon
+\end{equation}
+
+eventually reaching the  'full' model 
+
+\begin{equation}
+\text{ln}\hat{U}_{i} = \text{ns}(depth, \text{df}=4) + Dredge Width_{d,i} + Vessel_{v,i} + Bed_{b,i} + Month_{m,i} + Season_{i}+\epsilon
+\end{equation}
+
+Model improvement with the addition of new covariates was evaluated using an approximate $R^{2}$ statistic, 
+
+\begin{equation}
+R^{2} = \frac{D_{null} - D_{resid}}{D_{null}}
+\end{equation}
+
+where $D_{null}$ is the null deviance of the model and $D_{resid}$ is the residual deviance of the model. Model improvement was considered insignificant if increase in $R^{2}$ was less than 0.01 and $\Delta$ AIC was less than two per degree of freedom lost (Anderson 2008; Siddeek et al. 2016). Both gamma (with log link function) and lognormal error distributions were evaluated.
+
+Season coefficients were scaled using 
+
+\begin{equation}
+\beta^{\prime}_{i} = \frac{\beta_{i}}{\bar{\beta}}  
+\end{equation}
+
+where $\bar{\beta}$ is defined as
+
+\begin{equation}
+\bar{\beta} = \sqrt[n_{j}]{\prod_{j = 1}^{n_j}{\beta_{i,j}}}
+\end{equation}
+
+and $n_j$ is the number of coefficients in factor $i$ (i.e., season) (Siddeek et al. 2016). The existing GAM derived index and nominal round weight CPUE index based on retained catch data were scaled using the same method as GLM coefficients.
+
+# Results and Discussion {-}
+
+The best retained catch CPUE model included depth, month, dredge width, and season (Table \ref{table:modelres}), while the best total catch CPUE model only included depth and month (Table \ref{table:modelrestot}). The addition of vessel met significance criteria for AIC ($\Delta$ df = `r adfg_df - final_df`, $\Delta$ AIC retained catch = `r adfg_aic`, $\Delta$ AIC total catch = `r tot_adfg_aic`), but not deviance explained. Only two cooperative vessels have fished within the Kodiak Shelikof District since the 2014/15 season and they have maintained similar fishing performance (except in 2016/17 when one other vessel fished). It is unsuprising that the addition of bed met neither significance criteria since the Kodiak Shelikof District only contains one primary bed where most fishing effort occurs and two minor beds that are directly adjacent and only fished sporadically (Table \ref{table:modelres} - \ref{table:modelrestot}). Bed would likely be more informative in districts with active fishing on multiple beds, like Kodiak Northeast and Yakutat Districts. As with vessel, dredge width met significance criteria for AIC ($\Delta$ df = `r tot_dw_df - tot_final_df`, $\Delta$ AIC = `r tot_dw_aic`) in the total catch model, but not deviance explained (Table \ref{table:modelrestot}). Gamma distributed error appeared to marginally outperform log-normal distributed error based on diagnostic plots (Figures \ref{fig:gammadiag} - \ref{fig:lndiagtot}).
+
+The marginal effect of depth suggested a slightly decreasing wave-like curve, with a minor peak around 55 fathoms (Figure \ref{fig:deptheffect}). Partial residuals indicate that this relationship is particularly noisy. Depth distribution of weathervane scallops is not well understood, and is likely variable among beds, substrate types, and ocean conditions. The marginal effect of month suggested that CPUE is higher in July, similar throughout August - November (Figure \ref{fig:montheffect}). Most dredges occurred in July and it is unusual throughout the timeseries for a vessel to fish during more than one month during a given season. Month effect is possibly somewhat confounded by season since that are several years throughout the timeseries were both operating vessels finish only during July. As would be expected, hauls that used two 15 ft dredges (i.e., 30 ft dredge width) tended to have greater CPUE than hauls using two 13 ft dredges (i.e. 26 ft dredge width) in the retained catch model (Figure \ref{fig:dweffect}), though this wasn't the case in the total catch model.
+
+The resulting standardized CPUE indices steadily increased for the first three years and then undergo a continuous decline to a timeseries low during the 2016/17. CPUE rebounded drastically after 2016, reaching timeseries highs from the 2019/20 season to present and peak during the 2020/21 season (Tables \ref{table:table:stdcpueretained} - \ref{table:table:stdcpuetotal}; Figure \ref{fig:stdcpueplot}). Both nominal and GAM CPUE indices trend closely with CPUE based on the final model GLM until the 2021/22 season, where the GLM suggests minor increase (retained catch CPUE) or decrease (total catch CPUE) while nominal and GAM indices suggest a continued substantial increase (Figure \ref{fig:indexcompareplot}). Follow-up analyses indicated this departure was due to the GLM based index omitting anomalously high and low catches.
+
+# Literature Cited {-}
+
+\begin{hangparas}{.25in}{1}
+
+Anderson, D.R. 2008. Model based inference in the life sciences: A
+primer on evidence. Springer, New York. 184 pp. http://dx.doi.
+org/10.1007/978-0-387-74075-1  
+
+Maunder, M.N., A.E. Punt. 2004. Standardizing catch and effort data: A review
+of recent approaches. Fisheries Research 70:141-159. http://dx.doi.org/10.1016/j.
+fishres.2004.08.002  
+
+Maunder, M.N., J.R. Sibert, A. Fonteneau, J. Hampton, P. Kleiber, S.J. Harley. 2006. Interpreting catch per unit effort data to assess the status of individual stocks and communities. ICES Journal of Marine Science 63(8): 1373–1385. https://doi.org/10.1016/j.icesjms.2006.05.008  
+
+NPFMC (North Pacific Fishery Management Council). 2017. Stock Assessment and Fishery Evaluation (SAFE) Report for the Weathervane Scallop Fishery off Alaska. North Pacific Fishery Management Council, 605 West 4th Ave, Suite 306. Anchorage, AK.  
+
+NPFMC (North Pacific Fishery Management Council). 2022. Stock Assessment and Fishery Evaluation (SAFE) Report for the Weathervane Scallop Fishery off Alaska. North Pacific Fishery Management Council, 605 West 4th Ave, Suite 306. Anchorage, AK.  
+
+Siddeek, M.S.M., J. Zheng, D. Pengilly. 2016. Standardizing CPUE from Aleutian Islands 0097
+Golden King Crab Observer Data. In: T.J. Quinn II, J.L. Armstrong, M.R. Baker, J. Heifetz,
+and D. Witherell (eds.), Assessing and Managing Data-Limited Fish Stocks. Alaska Sea Grant,
+University of Alaska Fairbanks. http://doi.org/10.4027/amdlfs.2016.04  
+
+\end{hangparas}
+
+# Tables {-}
+
+\begin{table}[H]
+\centering
+\caption{Sample size of core commerical dredges by season with the KSH district.}
+   
+\label{table:samplesize}
+\begin{tabular}{lcc}
+Season & Number of Dredges\\
+\hline
+```{r samplesize, results='asis', eval = T}
+# print table
+print(xtable(ksh %>% count(season), align="lcc", digits=0),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline	
+\end{tabular} 
+\end{table}
+
+
+\begin{table}[H]
+\centering
+\caption{Effective degrees of freedom, approximate $R^{2}$, and $\Delta$ AIC for the null GLM fit to retained catch CPUE, final GLM, and additional covariates fit with gamma distributed error.}
+\label{table:modelres}
+\begin{tabular}{llccc}
+Model & Terms & df & $R^{2}$ & $\Delta$ AIC\\
+\hline
+Null & $Season$ & `r null_df` & `r null_r2` & 0\\
+Final & $\text{ns}(depth, \text{df}=4) + Dredge$ $Width + Month + Season$ & `r final_df` & `r final_r2` & `r final_aic`\\
+& Final$+Bed$ & `r bed_df` & `r bed_r2` & `r bed_aic`\\
+& Final$+Vessel$ & `r adfg_df` & `r adfg_r2` & `r adfg_aic`\\
+\hline
+\end{tabular} 
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Effective degrees of freedom, approximate $R^{2}$, and $\Delta$ AIC for the null GLM fit to total catch CPUE, final GLM, and additional covariates fit with gamma distributed error.}
+\label{table:modelrestot}
+\begin{tabular}{llccc}
+Model & Terms & df & $R^{2}$ & $\Delta$ AIC\\
+\hline
+Null & $Season$ & `r tot_null_df` & `r tot_null_r2` & 0\\
+Final & $\text{ns}(depth, \text{df}=4) + Month + Season$ & `r tot_final_df` & `r tot_final_r2` & `r tot_final_aic`\\
+& Final$+Bed$ & `r tot_bed_df` & `r tot_bed_r2` & `r tot_bed_aic`\\
+& Final$+Vessel$ & `r tot_adfg_df` & `r tot_adfg_r2` & `r tot_adfg_aic`\\
+& Final$+Dredge$ $Width$ & `r tot_dw_df` & `r tot_dw_r2` & `r tot_dw_aic`\\
+\hline
+\end{tabular} 
+\end{table}
+
+
+
+
+\begin{table}[H]
+\centering
+\caption{Standardized retained catch CPUE index, associated standard error, and CV for Kodiak Shelikof District based on a gamma distributed GLM.}
+   
+\label{table:stdcpueretained}
+\begin{tabular}{lcccc}
+Season & Index & $\sigma$ & CV\\
+\hline
+```{r stdcpueretained, results='asis', eval = T}
+# print table
+print(xtable(std_cpue_glm %>% 
+               mutate(year = as.character(year)), 
+             align="lcccc", digits=c(0, 2, 2, 2, 2)),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline	
+\end{tabular} 
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Standardized total catch CPUE index, associated standard error, and CV for Kodiak Shelikof District based on a gamma distributed GLM.}
+   
+\label{table:stdcpuetotal}
+\begin{tabular}{lcccc}
+Season & Index & $\sigma$ & CV\\
+\hline
+```{r stdcpuetotal, results='asis', eval = T}
+# print table
+print(xtable(std_cpue_glm_tot %>% 
+               mutate(year = as.character(year)), 
+             align="lcccc", digits=c(0, 2, 2, 2, 2)),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline	
+\end{tabular} 
+\end{table}
+
+# Figures {-}
+
+```{r gammadiag, fig.align = 'center', fig.cap = "Linear model diagnostics for the final model fit to retained catch CPUE with a gamma distributed error.", fig.height = 6, fig.width = 7, eval = T}
+diagnostics_best_glm_gamma
+```
+
+
+```{r lndiag, fig.align = 'center', fig.cap = "Linear model diagnostics for the final model fit to retained catch CPUE with a lognormal distributed error.", fig.height = 6, fig.width = 7, eval = T}
+diagnostics_best_glm_ln 
+```
+
+```{r gammadiagtot, fig.align = 'center', fig.cap = "Linear model diagnostics for the final model fit to total catch CPUE with a gamma distributed error.", fig.height = 6, fig.width = 7, eval = T}
+diagnostics_best_glm_gamma_tot
+```
+
+
+```{r lndiagtot, fig.align = 'center', fig.cap = "Linear model diagnostics for the final model fit to total catch CPUE with a lognormal distributed error.", fig.height = 6, fig.width = 7, eval = T}
+diagnostics_best_glm_ln_tot
+```
+
+```{r deptheffect, fig.align = 'center', fig.cap = "Marginal effect of depth (fa) in the final GLM model fit to retained catch CPUE (top) and total catch CPUE (bottom).", fig.height = 7, fig.width = 5, eval = T}
+depth_marg / depth_marg_tot
+```
+
+```{r montheffect, fig.align = 'center', fig.cap = "Marginal effect of month in the final GLM model to retained catch CPUE (top) and total catch CPUE (bottom).", fig.height = 7, fig.width = 5, eval = T}
+month_marg / month_marg_tot
+```
+
+```{r dweffect, fig.align = 'center', fig.cap = "Marginal effect of dredge width (ft) in the final GLM model.", fig.height = 3, fig.width = 5, eval = T}
+dredge_width_marg
+```
+
+```{r stdcpueplot, fig.align = 'center', fig.cap = "Standardized CPUE index estimated using gamma GLM for the Kodiak Shelikof District.", fig.height = 3, fig.width = 6, eval = T}
+std_index_plot
+```
+
+```{r indexcompareplot, fig.align = 'center', fig.cap = "Standardized CPUE index estimated using gamma GLM in comparision to scaled GAM and nominal (round weight / dredge hr) indices for the Kodiak Shelikof District.", fig.height = 3, fig.width = 6, eval = T}
+index_compare_plot
+```
+
+

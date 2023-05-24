@@ -1,0 +1,564 @@
+---
+title: "Appendix B: Stock Synthesis Evaluation of Kodiak Shelikof"
+author: |
+  | Tyler Jackson
+  | Alaska Department of Fish and Game, tyler.jackson@alaska.gov
+date: "`r format(Sys.time(), '%B %Y')`"
+output:
+  bookdown::pdf_document2:
+    toc: no
+header-includes:
+   - \usepackage{float}
+   - \usepackage{hanging}
+---
+
+```{r, echo = F, message = F, warning = F}
+library(tidyverse)
+library(xtable)
+
+knitr::opts_chunk$set(echo=FALSE, message=FALSE, warning=FALSE, fig.pos='H')
+
+```
+
+```{r result = F}
+# weight at length parameters
+wal <- read_csv("../../../../output/fishery_independent/statewide_scallop_survey/2022/wal_par.csv")
+```
+# Purpose {-}
+
+This document furthers efforts by Zheng (2018) and Jackson (2022) to evaluate population dynamics of weathervane scallops $Patinopecten$ $caurinus$ using the Stock Synthesis (Methot and Wetzel 2013). This analysis focuses solely on the Kodiak Shelikof District in which there is an annual commercial fishery and biannual fishery independent survey since 2016 (Burt et al., 2021).
+
+# Data {-}
+
+## Timeseries Data {-}
+
+\begin{itemize}
+
+\item Annual landings estimated in units of round (i.e. whole animal) biomass (t) from 1993 - 2022. Log standard error of retained catch was assumed to be 0.01 (Table \ref{table:fisherytab}).
+
+\item Nominal catch-per-unit-effort (CPUE; lb / dredge hr) from the commercial fishery from 1993 - 2008 (Table \ref{table:fisherytab}).
+
+\item Standardized CPUE estimates (Appendix C) from the commercial fishery from 2009 - 2022 (Table \ref{table:fisherytab}). 
+
+\item Estimated round biomass from the ADF\&G Dredge Survey from 2016 - 2022 (Table \ref{table:dredgetab}).
+
+\item Shell height composition from the commercial fishery 2009 - 2022 and the ADF\&G Dredge Survey from 2016 - 2022.
+
+\item Size conditional age composition from the commercial fishery 2009 - 2021 and the ADF\&G Dredge Survey from 2016 - 2022.
+
+\end{itemize}
+
+## Population Dynamics Parameters {-}
+
+\begin{itemize}
+
+\item Base natural mortality $M$ was assumed to be 0.19 yr$^{-1}$ (Jackson and Zheng 2022; Zheng 2018).
+
+\item Round weight at shell height parameters were estimated from ADF\&G Dredge Survey data (2016-2022) using the equation $W = \alpha SH^{\beta}$ to be $\alpha$ = `r round(wal$par[1], 6)` and $\beta$ = `r round(wal$par[2], 3)`.
+
+\item Size at maturity was estimated from ADF\&G Dredge Survey data using logistic regression (Jackson et al. 2021). Size at 50\% maturity (SM$_{50}$ = 7.3 cm) and slope of the regression equation ($\beta_{1}$ = -1.5) were used in this analysis.
+
+\item Dredge survey catchability is assumed full (i.e., $Q$ = 1) as a gear efficiency coefficient ($q$ = 0.83) was applied outside of the model.
+
+\end{itemize}
+
+# Model {-}
+
+Stock Synthesis (Methot 1989, 1990; Methot and Wetzel 2013) is a generalized age and size structured population dynamics model implemented in ADMB (Fournier et al. 2012). It contains a population sub-model to model growth, maturity, fecundity, recruitment, movement, and mortality, an observation sub-model to estimate expected values, a statistical sub-model to evaluate goodness of fit, and a forecast sub-model to project management quantities (Methot et al. 2020). Technical details of the modelling framework can be found in Methot (2000) and Methot and Wetzel (2013).
+
+## Model Structure {-}
+
+\begin{itemize}
+
+\item Size structure consisted of 33 shell height bins ranging from 2.1 cm to 18.1+ cm.
+
+\item Age structure consisted of 18 age bins (ages 1 - 18+).
+
+\item The modeled timeseries spans from 1992 - 2022.
+
+\item Each modeled year includes a single 12 month season (April - March) with model processes occurring at the following time steps:
+
+    \begin{itemize}
+    
+    \item The ADF\&G Dredge Survey occurs in May (month 2).
+
+    \item Spawning occurs in June (month 3).
+    
+    \item The month that the fishery occurs varies from July (month 4) to January (month 10).
+    
+    \end{itemize}
+
+\end{itemize}
+
+
+
+## Assumptions {-}
+
+Assumptions specific to models presented here include:
+
+\begin{enumerate}
+
+\item Males and females are combined in all model processes, and the sex ratio was assumed to be 50:50.
+
+\item Natural mortality (0.19 yr$^{-1}$) is kept constant across all sizes and modeled years.
+
+\item Shell height at age is estimated using the Schnute (1981) parametrization of von Bertalanffy growth model. The minimum age for von Bertalanffy growth is age-0 and the age at maximum shell height is age-18.
+
+\item Round weight at shell height is allometric and estimated outside of the model (see above).
+
+\item Maturity is a logistic function of shell height and estimated outside of the model using survey gonad condition data. Individuals can first become mature at age-3.
+
+\item Egg production (i.e. fecundity) is assumed to be equal to spawning biomass.
+
+\item Annual recruitment is estimated using with unconstrained annual recruitment deviations distributed $\mathcal{N}(0, 2)$.
+
+\item Catchability ($Q$) was estimated as a proportional scalar for both fishery CPUE indices separately, and is constant across years. 
+
+\item Fishery and survey selectivities (i.e., size and age) are estimated as a logistic function of shell height, and are constant across years. All models assumed selectivity was based on shell height and not age.
+
+\end{enumerate}
+
+
+# Scenarios Evaluated {-}
+
+The following model scenarios are presented in this report:
+
+\begin{itemize}
+
+\item \textbf{22.1a}: Model KSH22.1 (Jackson 2022) with updated 2022 ADF\&G Dredge Survey biomass and size and age composition data, as well as 2022/23 fishery catch, CPUE (based on retained catch), and size composition data.
+
+\item \textbf{23.0}: Model 22.1a including fishery discarded catch from 1996/97-2022/23 and size composition from 2009/10-2022/23.
+
+\item \textbf{23.0a}: Model 23.0 with extra standard error on standardized fishery CPUE from 2009/10-2022/23.
+
+\item \textbf{23.0a1}: Model 23.0a without dredge survey size and age composition data from 2016 - 2018.
+
+\item \textbf{23.0a3}: Model 23.0a with down-weighted dredge survey size composition data from 2016 - 2018 (0.5 $\cdot$ $N_{eff}$).
+
+\item \textbf{23.3}: Model 23.0a with full dredge survey selectivity (i.e. selectivity = 1) across all size classes.
+
+\end{itemize}
+
+# Results and Discussion {-}
+
+All model scenarios reached convergence and estimated parameters within bounds, with the exception of a dredge survey selectivity parameter in models 22.1a and 23.0a1 approaching the lower bound. Models 22.1a, 23.0 and 23.0a fit pre-2008 nominal fishery CPUE better than other models (Figure \ref{fig:cpueoldfig}; Table \ref{table:likcomp}), while models 22.1a, 23.0, 23.0a, and 23.0a3 resulted in the best fits to 2009 - 2022 standardized fishery CPUE (Figure \ref{fig:cpuenewfig}; Table \ref{table:likcomp}). Fit to dredge survey biomass was best in models 23.0a and 23.0a3, and was poor in model 22.1a (Figure \ref{fig:dredgebiomassfig}; Table \ref{table:likcomp}). 
+
+All models generally captured the shell height composition of discarded and retained scallops in most years (Figure \ref{fig:lencomp1fig} - \ref{fig:lencomp3fig}), with models 23.0a1 and 23.0a3 having slightly better fits overall (Table \ref{table:likcomp}). All models tend to over estimate the proportion of scallops in size classes greater than 150 mm and especially the plus group ($\geq$ 180 mm), suggesting some mispecification of mortality associated with those size classes. Fits to dredge survey shell height composition were poor for all models from 2016-2018, but were adequate for 2020 and 2022 (Figure \ref{fig:lencomp4fig}). From 2016 - 2018 the dredge survey was still under development while gear rigging and on-deck sampling methods were not fully standardized until 2020. Shell height selectivity in the fishery was similar among models that partitioned discarded and retained shell height compositions (all 23.x models), but was slightly lower for model 22.1a (Figure \ref{fig:selexfig}; Table \ref{table:parest}). Models that estimated dredge survey selectivity had difficulties doing so. Models 22.1a and 23.0a1 had parameter $\beta_2$ approaching its lower bound of zero, which brings selectivity to approximately 1 across all sizes. Models 23.0, 23.0a, and 23.0a3 estimated unusually low selectivities (Figure \ref{fig:selexfig}; Table \ref{table:parest}), which led to a much larger resulting spawning stock biomass for those models (Figure \ref{fig:ssbfig} - \ref{fig:ssbnosefig}). The precise cause of these discrepancies is unclear, but there seems to be support for full selectivity based on the large proportion of small scallops (i.e., < 100 mm) in the observed shell height composition and the gear design (i.e., the dredge employs a 38 mm mesh liner, Burt et al. 2021). Fits to age composition data were similar among all models for both the fishery and dredge survey. Generally, all models underestimated mean age of the largest size classes (Figure \ref{fig:agecomp1fig} - \ref{fig:residagecomp12fig}).  
+
+Recruitment trends were similar among all models, though the scale of recruitment pulses varied by model (Figure \ref{fig:recfig} - \ref{fig:recdevsfig}; Table \ref{table:parest}). Models 23.0, 23.0a, and 23.0a3 tended to estimate the largest recruitment through much of the timeseries. All models estimated a large recruitment pulse in 2021, which will likely be refined in future modelling efforts, since recruitment estimates are solely based on the high proportion of scallops < 50 mm caught in the 2022 dredge survey. It is noteworthy that models 22.1a, 23.0a1, and 23.3 estimated substantially lower recruitment in 2021 than other models, which relates to the estimated shell height selectivity in the dredge survey.
+
+Spawning stock biomass (SSB) increased in the early years of the timeseries and peaked in the mid-1990s, before decreasing until 2001. Following 2001, SSB increased steadily until peaking again in 2005-2007 and decreasing to the lowest levels of the timeseries in 2017, which coincides with the lowest retained catch in the timesries (Table \ref{table:fisherytab}). Trends in SSB begin to diverge by model scenario after \~ 2018 with 23.0a1 and 23.3 undergoing a modest increase to levels lower than the 2005-2007 peak, 22.1a and 23.0a3 undergoing more drastic increases that were the highest values in the timerseries, and 23.0 and 23.0a undergoing near exponential increases which are still climbing (Figure \ref{fig:ssbfig} - \ref{fig:ssbnosefig}). Models 23.0a1 and 23.3 appear to yield the most realistic timeseries trend in SSB based on what is known about the management history of the stock.
+
+Model 23.3 had considerably less retrospective bias in both SSB (Mohn's $\rho$ = -0.058) and recruitment (Mohn's $\rho$ = -0.074) than did other models (Figures \ref{fig:ssbretro1fig} - \ref{fig:recretro6fig}). Retrospective patterns for models 22.1a - 23.0a3 were likely related to poor fits to dredge shell height composition data from 2016 - 2018 and associated issues with estimating selectivity.
+
+# Author's Recomendation {-}
+
+Despite model 23.3 having the most probable trend in SSB and least retrospective bias, it did not fit fishery CPUE and dredge survey biomass as well as other models (Table \ref{table:likcomp}). The author recommends continuing to explore model 23.3 as well as 23.0a, which resulted in the best overall fit among other models (Table \ref{table:likcomp}). Specifically, further work should focus on 
+
+\begin{itemize}
+
+\item Recovering 1992 - 2008 fishery CPUE data to compute a standardized index and more informed standard error.  
+
+\item Recovering fishery shell height composition data pre-2009, and adding age composition data from 2020 - present.
+
+\item Improving model 23.3 fits to relative abundance indices.
+
+\item Exploring dredge survey catchability (currently applied outside of the model), including timevarying catchability to account for standardization of survey methods from 2016 - 2018 and after 2023 (new survey dredge). 
+
+\item Continuing to troubleshoot estimation of dredge survey selectivity.
+
+\end{itemize}
+
+# Literature Cited {-}
+
+\begin{hangparas}{.25in}{1}
+
+Burt, R., M. Byerly, A. Hopkins, T. Jackson, and K. McNeel. 2021. Weathervane scallop dredge survey operational plan, 2021–2023. Alaska Department of Fish and Game, Division, Division of Commercial Fisheries, Regional Operational Plan No. ROP.CF.4K.2021.09, Kodiak.   
+
+Fournier, D.A., H.J. Skaug, J. Ancheta, J. Ianelli, A. Magnusson, M.N. Maunder, A. Nielsen, and J. Sibert. 2012. AD Model Builder: using automatic differentiation for statistical inference of highly parameterized complex nonlinear models. Optimization Methods Software 27: 233-249.  
+
+Jackson, T., R. Burt, and A. Hopkins. 2021. 2019–2020 Weathervane scallop dredge survey report. Alaska Department of Fish and Game, Fishery Data Series No. 21-16, Anchorage.  
+
+Jackson, T., J. Zheng. 2022. Size and age structured modelling of weathervane scallops using Stock Synthesis. $In$ NPFMC (North Pacific Fishery Management Council). 2022. Stock Assessment and Fishery Evaluation (SAFE) Report for the Weathervane Scallop Fishery off Alaska. North Pacific Fishery Management Council, 605 West 4th Ave, Suite 306. Anchorage, AK.  
+
+Jackson, T., A. Hopkins, and R. Burt. $in$ $press$. Weathervane scallop dredge survey, 2022. Regional Information Report.  
+
+Methot, R.D., 1989. Synthetic estimates of historical and current biomass of northern anchovy, Engraulis mordax. American Fisheries Society Symposium 6: 66–82.  
+
+Methot, R.D., 1990. Synthesis model: an adaptable framework for analysis of diverse stock assessment data. International North Pacific Fisheries Commission Bulletin 50: 259–277.   
+
+Methot, R.D., 2000. Technical description of the Stock Synthesis assessment program. NOAA Tech Memo. NMFS-NWFSC-43.  
+
+Methot, R.D., and C.R. Wetzel. 2013. Stock synthesis: A biological and statistical framework for fish stock assessment and fishery management. Fisheries Research 142: 86-99.
+Methot R.D., C.R. Wetzel, I.G. Taylor, and K. Doering. 2020. Stock Synthesis user manual version 3.30.16. NOAA Fisheries, Seattle WA.   
+
+Zheng, J. 2018. Evaluation of a Stock Synthesis Approach to Assess Weathervane Scallops in Kamishak Bay, Alaska. Presentation to the NPFMC Scallop Plan Team, February, 2018.
+
+\end{hangparas}
+
+# Tables {-}
+
+\begin{table}[H]
+\centering
+\caption{Retained round weight of catch and discard mortality, catch per unit effort indices (1993-2008; 2009-2022) and associated standard errors for the Kodiak Shelikof District.}
+\label{table:fisherytab}
+\begin{tabular}{lccccc}
+Year & Retained Catch (t) & Discard Mortality (t) & CPUE Index & Index ln $\sigma$\\
+\hline
+```{r fisherytab, results='asis', eval = T}
+# print table
+catch <- read_delim("../../../../data/model_development/stock_synthesis/2023/catch.txt")
+disc <- read_delim("../../../../data/model_development/stock_synthesis/2023/dead_discards.txt")
+cpue1 <- read_delim("../../../../data/model_development/stock_synthesis/2023/fishery_std_index.txt")
+cpue2 <- read_delim("../../../../data/model_development/stock_synthesis/2023/fishery_nom_index.txt")
+
+catch %>%
+  mutate(catch = prettyNum(catch, big.mark = ",")) %>%
+  add_row(year = 1995, catch = "Closed") %>%
+  left_join(bind_rows(cpue1, cpue2), by = "year") %>%
+  left_join(disc, by = "year") %>%
+  arrange(year) %>%
+  transmute(year = as.character(year), catch, obs.y, obs.x, log_se.x) -> fishery_tab
+
+
+print(xtable(fishery_tab, align="lccccc", digits = c(0, 0, 2, 2, 3, 2)),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+
+\begin{table}[H]
+\centering
+\caption{Dredge survey round biomass and associated standard errors for the Kodiak Shelikof District.}
+\label{table:dredgetab}
+\begin{tabular}{lccc}
+Year & Biomass (t) & ln $\sigma$\\
+\hline
+```{r dredgetab, results='asis', eval = T}
+# print table
+dredge <- read_delim("../../../../data/model_development/stock_synthesis/2023/dredge_index.txt")
+
+dredge %>%
+  transmute(year = as.character(year), obs, log_se) -> dredge_tab
+
+
+print(xtable(dredge_tab, align="lccc", digits = c(0, 0, 0, 2)),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+\begin{table}[H]
+\centering
+\caption{Number of estimable parameters by model scenario.}
+\label{table:parnumtab}
+\begin{tabular}{lccccccc}
+\hline
+Process & 22.1a & 23.0 & 23.0a & 23.0a1 & 23.0a3 & 23.3\\
+Growth & 5 & 5 & 5 & 5 & 5 & 5\\
+Initial Numbers-at-Age & 17 & 17  & 17 & 17 & 17 & 17\\
+Virgin Recruitment & 1 & 1 & 1 & 1 & 1 & 1\\
+Recruitment Deviations & 32 & 32 & 32 & 32 & 32 & 32\\
+Catchability & 2 & 2 & 3 & 3 & 3 & 3\\
+Selectivity & 4 & 4 & 4 & 4 & 4 & 2\\
+Retention & 0 & 2 & 2 & 2 & 2 & 2\\
+Total & 61 & 63 & 64 & 64 & 64 & 62\\
+\hline
+\end{tabular}
+\end{table}
+
+
+
+
+
+\begin{table}[H]
+\centering
+\caption{Likelihood components by model scenario.}
+\label{table:likcomp}
+\begin{tabular}{lccccccc}
+Process & 22.1a & 23.0 & 23.0a & 23.0a1 & 23.0a3 & 23.3\\
+\hline
+```{r likcomp, results='asis', eval = T}
+# print table
+lik_comp <- read_delim("./likelihood_comp.txt", col_types = "ccccccc")
+print(xtable(lik_comp, align="lccccccc", digits = 3),
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[H]
+\centering
+\caption{Select parameter estimates for each model scenario. Parameters estimates approaching bounds are denoted by red text and (*) denotes fixed parameters.}
+\label{table:parest}
+\begin{tabular}{lcccccccc}
+Parameter & Bounds & 22.1a & 23.0 & 23.0a & 23.0a1 & 23.0a3 & 23.3\\
+\hline
+```{r parest, results='asis', eval = T}
+# print table
+pars <- read_delim("./par_est.txt", delim = " ", col_types = "cccccccc")
+print(xtable(x = pars, align="lcccccccc", digits = 3),
+           sanitize.text.function=function(x){x},
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}
+
+
+\begin{table}[H]
+\centering
+\caption{Unfished recruitment and unfished and forecasted spawning biomass for each model scenarios.}
+\label{table:ssbest}
+\begin{tabular}{lccccccc}
+& 22.1a & 23.0 & 23.0a & 23.0a1 & 23.0a3 & 23.3\\
+\hline
+```{r ssbest, results='asis', eval = T}
+# print table
+ssb <- read_delim("./ssb_rec.txt", delim = " ")
+print(xtable(x = ssb, align="lccccccc", digits = 0),
+           sanitize.text.function=function(x){x},
+			     only.contents=TRUE,
+			     include.rownames=FALSE,
+			     floating=FALSE,
+			     include.colnames=FALSE,
+			     hline.after=NULL,
+			     format.args = list(big.mark = ","))
+
+```
+\hline
+\end{tabular}
+\end{table}  
+  
+
+# Figures{-}
+
+<!-- index fits -->
+
+```{r cpueoldfig, fig.align = 'center', fig.cap="Fit to nominal fishery CPUE index from 1992-2008 by model scenario. Error bars indicate 95\\% confidence intervals.", eval = T}
+knitr::include_graphics("./plots/cpue1992-2008_fit.png")
+```
+
+```{r cpuenewfig, fig.align = 'center', fig.cap="Fit to standardized fishery CPUE index from 2009-2022 by model scenario. Black error bars indicate 95\\% confidence intervals and grey error bars indicate addition estimated error.", eval = T}
+knitr::include_graphics("./plots/cpue2009-2022_fit.png")
+```
+
+```{r dredgebiomassfig, fig.align = 'center', fig.cap="Fit to ADF\\&G dredge survey biomass by model scenario. Black error bars indicate 95\\% confidence intervals and grey error bars indicate addition estimated error.", eval = T}
+knitr::include_graphics("./plots/dredge_biomass_fit.png")
+```
+
+<!-- lencompfits --> 
+
+```{r lencomp1fig, fig.align = 'center', fig.cap="Fit to fishery shell height composition (i.e., retained and discarded scallops) for model 22.1a.", eval = T}
+knitr::include_graphics("./plots/fishery_lencomp_fit_22.1a.png")
+```
+
+```{r lencomp2fig, fig.align = 'center', fig.cap="Fit to fishery discarded scallop shell height composition by model scenario.", eval = T}
+knitr::include_graphics("./plots/fishery_lencomp_fit_discards.png")
+
+```
+
+```{r lencomp3fig, fig.align = 'center', fig.cap="Fit to fishery retained scallop shell height composition by model scenario.", eval = T}
+knitr::include_graphics("./plots/fishery_lencomp_fit_retained.png")
+```
+
+```{r lencomp4fig, fig.align = 'center', fig.cap="Fit to ADF\\&G dredge survey shell height composition by model scenario.", eval = T}
+knitr::include_graphics("./plots/dredge_lencomp_fit.png")
+```
+
+<!-- selectivity  -->
+
+```{r selexfig, fig.align = 'center', fig.cap="Fishery and ADF\\&G dredge survey shell height selectivity by model scenario.", eval = T}
+knitr::include_graphics("./plots/selex_all.png")
+```
+
+```{r retentionfig, fig.align = 'center', fig.cap="Fishery retention on the basis of shell height by model scenario.", eval = T}
+knitr::include_graphics("./plots/retention.png")
+```
+
+<!-- agecompfits --> 
+
+```{r agecomp1fig, fig.align = 'center', fig.cap="Fit to fishery age composition by model scenario.", eval = T}
+knitr::include_graphics("./plots/fleet1_age_comp_fit.png")
+```
+
+```{r residagecomp1fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 22.1a", eval = T}
+knitr::include_graphics("./plots/22.1a_fleet1_age_comp_resid.png")
+```
+
+```{r residagecomp2fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 23.0.", eval = T}
+knitr::include_graphics("./plots/23.0_fleet1_age_comp_resid.png")
+```
+
+```{r residagecomp3fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 23.0a.", eval = T}
+knitr::include_graphics("./plots/23.0a_fleet1_age_comp_resid.png")
+```
+
+```{r residagecomp4fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 23.0a1.", eval = T}
+knitr::include_graphics("./plots/23.0a1_fleet1_age_comp_resid.png")
+```
+
+```{r residagecomp5fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 23.0a3.", eval = T}
+knitr::include_graphics("./plots/23.0a3_fleet1_age_comp_resid.png")
+```
+
+```{r residagecomp6fig, fig.align = 'center', fig.cap="Fishery age composition pearson residuals for model 23.3.", eval = T}
+knitr::include_graphics("./plots/23.3_fleet1_age_comp_resid.png")
+```
+
+```{r agecomp2fig, fig.align = 'center', fig.cap="Fit to ADF\\&G dredge survey age composition by model scenario.", eval = T}
+knitr::include_graphics("./plots/fleet2_age_comp_fit.png")
+```
+
+```{r residagecomp7fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 22.1a", eval = T}
+knitr::include_graphics("./plots/22.1a_fleet2_age_comp_resid.png")
+```
+
+```{r residagecomp8fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 23.0.", eval = T}
+knitr::include_graphics("./plots/23.0_fleet2_age_comp_resid.png")
+```
+
+```{r residagecomp9fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 23.0a.", eval = T}
+knitr::include_graphics("./plots/23.0a_fleet2_age_comp_resid.png")
+```
+
+```{r residagecomp10fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 23.0a1.", eval = T}
+knitr::include_graphics("./plots/23.0a1_fleet2_age_comp_resid.png")
+```
+
+```{r residagecomp11fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 23.0a3.", eval = T}
+knitr::include_graphics("./plots/23.0a3_fleet2_age_comp_resid.png")
+```
+
+```{r residagecomp12fig, fig.align = 'center', fig.cap="ADF\\&G dredge survey age composition pearson residuals for model 23.3.", eval = T}
+knitr::include_graphics("./plots/23.3_fleet2_age_comp_resid.png")
+```
+
+<!-- recruitment -->
+
+```{r recfig, fig.align = 'center', fig.cap="Predicted annual recruitment (millions) by model scenario.", eval = T}
+knitr::include_graphics("./plots/rec.png")
+```
+
+```{r recdevsfig, fig.align = 'center', fig.cap="Recruitment deviations and associated 95\\% confidence intervals.", eval = T}
+knitr::include_graphics("./plots/rec_devs.png")
+```
+
+<!-- n matrix -->
+
+```{r natage1fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 22.1a.", eval = T}
+knitr::include_graphics("./plots/22.1a_begin_natage.png")
+```
+
+```{r natage2fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 23.0.", eval = T}
+knitr::include_graphics("./plots/23.0_begin_natage.png")
+```
+
+```{r natage3fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 23.0a.", eval = T}
+knitr::include_graphics("./plots/23.0a_begin_natage.png")
+```
+
+```{r natage4fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 23.0a1.", eval = T}
+knitr::include_graphics("./plots/23.0a1_begin_natage.png")
+```
+
+```{r natage5fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 23.0a3.", eval = T}
+knitr::include_graphics("./plots/23.0a3_begin_natage.png")
+```
+
+```{r natage6fig, fig.align = 'center', fig.cap="Beginning of year numbers at age matrix (millions) for model 23.3.", eval = T}
+knitr::include_graphics("./plots/23.3_begin_natage.png")
+```
+
+<!-- ssb -->
+
+```{r ssbfig, fig.align = 'center', fig.cap="Estimated spawning stock biomass (t) by model scenario.", eval = T}
+knitr::include_graphics("./plots/ssb.png")
+```
+
+```{r ssbnosefig, fig.align = 'center', fig.cap="Estimated spawning stock biomass (t) by model scenario, without 95\\% confidence intervals.", eval = T}
+knitr::include_graphics("./plots/ssb_no_se.png")
+```
+
+<!-- retrospectives -->
+
+```{r ssbretro1fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 22.1a going back to 2017.", eval = T}
+knitr::include_graphics("./22.1a/retro/plots/retro_ssb.png")
+```
+
+```{r ssbretro2fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 23.0 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0/retro/plots/retro_ssb.png")
+```
+
+```{r ssbretro3fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 23.0a going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a/retro/plots/retro_ssb.png")
+```
+
+```{r ssbretro4fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 23.0a1 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a1/retro/plots/retro_ssb.png")
+```
+
+```{r ssbretro5fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 23.0a3 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a3/retro/plots/retro_ssb.png")
+```
+
+```{r ssbretro6fig, fig.align = 'center', fig.cap="Spawning stock biomass from retrospective analysis of model 23.3 going back to 2017.", eval = T}
+knitr::include_graphics("./23.3/retro/plots/retro_ssb.png")
+```
+
+```{r recretro1fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 22.1a going back to 2017.", eval = T}
+knitr::include_graphics("./22.1a/retro/plots/retro_rec.png")
+```
+
+```{r recretro2fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 23.0 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0/retro/plots/retro_rec.png")
+```
+
+```{r recretro3fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 23.0a going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a/retro/plots/retro_rec.png")
+```
+
+```{r recretro4fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 23.0a1 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a1/retro/plots/retro_rec.png")
+```
+
+```{r recretro5fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 23.0a3 going back to 2017.", eval = T}
+knitr::include_graphics("./23.0a3/retro/plots/retro_rec.png")
+```
+
+```{r recretro6fig, fig.align = 'center', fig.cap="Recruitment estimates (millions) from retrospective analysis of model 23.3 going back to 2017.", eval = T}
+knitr::include_graphics("./23.3/retro/plots/retro_rec.png")
+```

@@ -8,14 +8,61 @@ library(tidyverse)
 library(ggpmisc)
 library(r4ss)
 
-## ggplot axis ticks
-yr_axis <- scale_x_continuous(breaks = FNGr::tickr(tibble(yr = 1900:2100), yr, 5)$breaks,
-                              labels = FNGr::tickr(tibble(yr = 1900:2100), yr, 5)$labels)
+# graphic options
+theme_sleek <- function(base_size = 12, base_family = "Times") {
+  
+  windowsFonts(Times=windowsFont("TT Times New Roman"))
+  
+  half_line <- base_size/2
+  
+  theme_light(base_size = base_size, base_family = base_family) +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.ticks.length = unit(half_line / 2.2, "pt"),
+      strip.background = element_rect(fill = NA, colour = NA),
+      strip.text.x = element_text(colour = "black"),
+      strip.text.y = element_text(colour = "black"),
+      #axis.text = element_text(colour = "grey30"),
+      #axis.title = element_text(colour = "grey30"),
+      #legend.title = element_text(colour = "grey30"),#, size = rel(0.9)
+      panel.border = element_rect(fill = NA),#, colour = "grey70", size = 1),
+      legend.key.size = unit(0.9, "lines"),
+      #legend.text = element_text(size = rel(0.7)),#, colour = "grey30"),
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.background = element_rect(colour = NA, fill = NA)#,
+      #plot.title = element_text(colour = "grey30"),#, size = rel(1)
+      #plot.subtitle = element_text(colour = "grey30")#, size = rel(.85)
+    )
+  
+}
+
+# Depends on dplyr
+tickr <- function(
+    data, # dataframe
+    var, # column of interest
+    to # break point definition
+) {
+  
+  VAR <- enquo(var) # makes VAR a dynamic variable
+  
+  data %>%
+    dplyr::filter(!is.na(!!VAR)) %>%
+    distinct(!!VAR) %>%
+    mutate(labels = ifelse(!!VAR %in% seq(to * round(min(!!VAR) / to), max(!!VAR), to),
+                           !!VAR, "")) %>%
+    dplyr::select(breaks = UQ(VAR), labels)
+}
+
+
+# ggplot axis ticks
+yr_axis <- scale_x_continuous(breaks = tickr(tibble(yr = 1900:2100), yr, 5)$breaks,
+                              labels = tickr(tibble(yr = 1900:2100), yr, 5)$labels)
 
 # change ggplot default colors
-ggplot <- function(...) ggplot2::ggplot(...) + scale_colour_brewer(palette = "Set1") + scale_fill_brewer(palette = "Set1")
+ggplot <- function(...) ggplot2::ggplot(...) + scale_colour_brewer(palette = "Dark2") + scale_fill_brewer(palette = "Dark2")
 
-theme_set(FNGr::theme_sleek())
+theme_set(theme_sleek())
 
 # functions -----
 
@@ -36,41 +83,36 @@ f_change_nat_M <- function(scenario_path, new_M){
   
 }
 ## survey index plots by model scenario
-f_plot_index_comparison <- function(summaryoutput, yaxis_titles, models = mod_names, index_fleets, file_paths) {
+f_plot_index <- function(summaryoutput, models, fleet_num, y_title, file_path) {
   
   summaryoutput$indices %>%
     as_tibble() %>%
     rename_all(tolower) %>%
-    mutate(scenario = models[imodel]) -> index_dat
+    mutate(scenario = models[imodel]) %>% #pull(fleet_name)
+    filter(fleet %in% fleet_num) %>%
 
-  
-  plot_list = list()
-  for (i in 1:length(index_fleets)) {
-    index_dat %>%
-      filter(fleet == index_fleets[i]) %>%
-      
-      # plot
-      ggplot()+
-      geom_point(aes(x = yr, y = obs))+
-      geom_errorbar(aes(x = yr,
-                        ymin = qlnorm(0.025, meanlog = log(obs), sdlog = se), 
-                        ymax = qlnorm(0.975, meanlog = log(obs), sdlog = se)), 
-                    width = 0)+
-      geom_line(aes(x = yr, y = exp, color = scenario, linetype = scenario))+
-      labs(x = NULL, y = yaxis_titles[i], color = NULL, linetype = NULL)+
-      scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
-      yr_axis+
-      theme(legend.justification = c(1, 1), legend.position = c(1, 1)) -> plot_list[[i]]
-  }
-  # write plot to directory
-  purrr::map2(file_paths, plot_list, ggsave, height = 3, width = 5, units = "in")
-  
-  return(plot_list)
-  
-
+    # plot
+    ggplot()+
+    geom_errorbar(aes(x = yr,
+                      ymin = qlnorm(0.025, meanlog = log(obs), sdlog = se), 
+                      ymax = qlnorm(0.975, meanlog = log(obs), sdlog = se)), 
+                  width = 0, color = "grey60")+
+    geom_errorbar(aes(x = yr,
+                      ymin = qlnorm(0.025, meanlog = log(obs), sdlog = se_input), 
+                      ymax = qlnorm(0.975, meanlog = log(obs), sdlog = se_input)), 
+                  width = 0, color = "black")+
+    geom_point(aes(x = yr, y = obs))+
+    geom_line(aes(x = yr, y = exp, linetype = scenario, color = scenario))+
+    labs(x = NULL, y = y_title, color = NULL, linetype = NULL)+
+    scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
+    yr_axis+
+    theme(legend.justification = c(0, 1), legend.position = c(0, 1)) -> x
+    
+    # write plot to directory
+    ggsave(file_path, plot = x,  height = 4, width = 6, units = "in")
   }
 ## ssb plots by model scenario
-f_plot_ssb_comparison <- function(summaryoutput, models = mod_names, fleets, file_path, ylim = c(NA, NA)) {
+f_plot_ssb <- function(summaryoutput, models, fleets, file_path, ylim = c(NA, NA), se = T) {
   # estimate
   summaryoutput$SpawnBio %>%
     as_tibble() %>%
@@ -90,6 +132,7 @@ f_plot_ssb_comparison <- function(summaryoutput, models = mod_names, fleets, fil
     dplyr::select(-label) %>%
     pivot_longer(models, names_to = "scenario", values_to = "upr") -> ssbupr_dat
   
+  if(se == T){
   # plot
   left_join(ssb_dat, ssblwr_dat, by = c("yr", "scenario")) %>%
     left_join(ssbupr_dat, by = c("yr", "scenario")) %>%
@@ -103,26 +146,42 @@ f_plot_ssb_comparison <- function(summaryoutput, models = mod_names, fleets, fil
       scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
       coord_cartesian(ylim = ylim)+
       yr_axis+
-      theme(legend.justification = c(1, 1), legend.position = c(1, 1)) -> x
+      theme(legend.justification = c(0, 1), legend.position = c(0, 1)) -> x
+  }
+  if(se == F){
+    # plot
+    left_join(ssb_dat, ssblwr_dat, by = c("yr", "scenario")) %>%
+      left_join(ssbupr_dat, by = c("yr", "scenario")) %>%
+      # plot
+      ggplot()+
+      geom_point(data = ssb_dat %>% filter(yr == min(yr)),
+                 aes(x = yr, y = ssb, color = scenario, shape = scenario))+
+      geom_line(aes(x = yr, y = ssb, color = scenario))+
+      labs(x = NULL, y = "Spawning Biomass (t)", color = NULL, shape = NULL)+
+      scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
+      coord_cartesian(ylim = ylim)+
+      yr_axis+
+      theme(legend.justification = c(0, 1), legend.position = c(0, 1)) -> x
+  }
     
   # write plot to directory
-  ggsave(file_path, plot = x,  height = 3, width = 5, units = "in")
+  ggsave(file_path, plot = x,  height = 4, width = 6, units = "in")
   
   return(x)
   
 }
 ## size and age selectivities by model scenario
 ## selectivity is not time varying
-f_plot_selex_comparison <- function(summaryoutput, models = mod_names, fleets, file_path, type = c("size", "age")) {
-  
-  if(type == "size"){
+f_plot_selex <- function(summaryoutput, models = mod_names, fleets, file_path, height = 3, width = 6) {
+
     summaryoutput$sizesel %>%
       as_tibble() %>%
       rename_all(tolower) %>%
       filter(yr == max(yr),
              fleet %in% fleets) %>%
       mutate(scenario = models[imodel],
-             fleet = unique(unlist(mod_summaries$FleetNames))[fleet]) %>%
+             fleet = unique(unlist(mod_summaries$FleetNames))[fleet],
+             fleet = tools::toTitleCase(tolower(fleet))) %>%
       dplyr::select(fleet, scenario, grep(pattern = "[[:digit:]]", names(.), value = T)) %>%
       pivot_longer(3:ncol(.), names_to = "sh", values_to = "sel") %>%
       mutate(sh = as.numeric(sh)) %>%
@@ -130,34 +189,46 @@ f_plot_selex_comparison <- function(summaryoutput, models = mod_names, fleets, f
       ggplot()+
       geom_line(aes(x = sh, y = sel, group = scenario, color = scenario, linetype = scenario))+
       labs(x = "Shell Height (cm)", y = "Selectivity", color = NULL, linetype = NULL)+
-      theme(legend.justification = c(0, 1), legend.position = c(0, 1))+
-      facet_wrap(~fleet) -> x}
-  
-  if(type == "age"){
-    summaryoutput$agesel %>%
-      as_tibble() %>%
-      rename_all(tolower) %>%
-      filter(yr == max(yr),
-             fleet %in% fleets) %>%
-      mutate(scenario = models[imodel],
-             fleet = unique(unlist(mod_summaries$FleetNames))[fleet]) %>%
-      dplyr::select(fleet, scenario, grep(pattern = "[[:digit:]]", names(.), value = T)) %>%
-      pivot_longer(3:ncol(.), names_to = "age", values_to = "sel") %>%
-      mutate(age = as.numeric(age)) %>%
-      
-      ggplot()+
-      geom_line(aes(x = age, y = sel, group = scenario, color = scenario, linetype = scenario))+
-      labs(x = "Age", y = "Selectivity", color = NULL, linetype = NULL)+
-      theme(legend.justification = c(0, 1), legend.position = c(0, 1))+
-      facet_wrap(~fleet) -> x}
+      facet_wrap(~fleet) -> x
+
   # write plot to directory
-  ggsave(file_path, plot = x,  height = 3, width = 6, units = "in")
+  ggsave(file_path, plot = x,  height = height, width = width, units = "in")
+  
+  return(x)
+  
+}
+## selectivity is not time varying
+f_plot_retention <- function(dirs, models = mod_names, file_path, height = 3, width = 4) {
+  
+  ## load all rep files
+  biglist <- SSgetoutput(dirvec = dirs, verbose = F)
+  
+  ## prep data
+  tibble(model = 1:length(biglist),
+         replist = biglist) %>%
+    ## extract comps
+    mutate(selex = purrr::map(replist, function(x){return(x$sizeselex %>% as_tibble)}),
+           scenario = models[model]) %>%
+    dplyr::select(scenario, selex) %>%
+    unnest(selex) %>%
+    filter(Factor == "Ret", Yr == max(Yr), Fleet == 1) %>%
+    rename_all(tolower) %>%
+    dplyr::select(scenario, grep(pattern = "[[:digit:]]", names(.), value = T)) %>%
+    pivot_longer(2:ncol(.), names_to = "sh", values_to = "ret") %>%
+    mutate(sh = as.numeric(sh)) %>%
+    
+    ggplot()+
+    geom_line(aes(x = sh, y = ret, group = scenario, color = scenario, linetype = scenario))+
+    labs(x = "Shell Height (cm)", y = "Retention", color = NULL, linetype = NULL)-> x
+  
+  # write plot to directory
+  ggsave(file_path, plot = x,  height = height, width = width, units = "in")
   
   return(x)
   
 }
 ## comp fit by model scenario
-f_plot_comp_comparison <- function(dirs, models = mod_names, type = c("size", "age"), fleets, file_path, height = 6, width = 8) {
+f_plot_lencomp <- function(dirs, models, fleet_num, partition, file_path, height = 7, width = 7) {
   ## load all rep files
   biglist <- SSgetoutput(dirvec = dirs, verbose = F)
   
@@ -166,60 +237,107 @@ f_plot_comp_comparison <- function(dirs, models = mod_names, type = c("size", "a
          replist = biglist) %>%
     ## extract comps
     mutate(size_comp = purrr::map(replist, function(x){return(x$lendbase %>% as_tibble)}),
-           age_comp = purrr::map(replist, function(x){return(x$agedbase %>% as_tibble)}),
-           scenario = models[model]) -> tmp
-  
-  ## comp figures
-  plot_list <- NULL
-  if(type == "size"){for(i in fleets){
-    tmp %>%
+           scenario = models[model]) %>%
       dplyr::select(scenario, size_comp) %>%
-      unnest(size_comp) %>%
+      unnest(size_comp) %>% 
       dplyr::select(-sex) %>%
       rename_all(tolower) %>%
-      filter(fleet == i) %>%
+      filter(fleet == fleet_num,
+             part == partition) %>%
       mutate(annotation = paste0("N adj = ", nsamp_adj, "\n", "N eff = ", round(effn, 1))) %>%
+    
+
       
       ggplot()+
-      geom_bar(aes(x = bin, y = obs), stat = "identity", position = "identity", color = 1, fill = "grey80")+
-      geom_line(aes(x = bin, y = exp, color = scenario))+
+      geom_bar(aes(x = bin, y = obs), stat = "identity", position = "identity", color = "grey80", fill = "grey80")+
+      geom_line(aes(x = bin, y = exp, color = scenario, linetype = scenario))+
       geom_text_npc(aes(npcx = "left", npcy = "top", label = yr), check_overlap = T)+
-      geom_text_npc(aes(npcx = "right", npcy = "top", label = annotation), check_overlap = T, size = 3)+
-      labs(x = "Shell Height (cm)", y = "Proportion", color = NULL)+
-      scale_y_continuous(expand = expansion(mult = c(0, 0.5)))+
-      facet_wrap(~yr)+
+      #geom_text_npc(aes(npcx = "right", npcy = "top", label = annotation), check_overlap = T, size = 3)+
+      labs(x = "Shell Height (cm)", y = "Proportion", color = NULL, linetype = NULL)+
+      #scale_y_continuous(expand = expansion(mult = c(0, 0.5)))+
+      facet_wrap(~yr, ncol = 3)+
       theme(panel.spacing = unit(0, "lines"),
             strip.text.x = element_blank(),
-            strip.background = element_blank()) -> plot_list[[grep(i, fleets)]]
-  }}
-  if(type == "age"){for(i in fleets){
-    tmp %>%
-      dplyr::select(scenario, age_comp) %>%
-      unnest(age_comp) %>%
-      dplyr::select(-sex) %>%
-      rename_all(tolower) %>%
-      filter(fleet == i) %>%
-      mutate(annotation = paste0("N adj = ", nsamp_adj, "\n", "N eff = ", round(effn, 1))) %>%
-      
-      ggplot()+
-      geom_bar(aes(x = bin, y = obs), stat = "identity", position = "identity", color = 1, fill = "grey80")+
-      geom_line(aes(x = bin, y = exp, color = scenario))+
-      geom_text_npc(aes(npcx = "left", npcy = "top", label = yr), check_overlap = T)+
-      geom_text_npc(aes(npcx = "right", npcy = "top", label = annotation), check_overlap = T, size = 3)+
-      labs(x = "Age", y = "Proportion", color = NULL)+
-      scale_y_continuous(expand = expansion(mult = c(0, 0.5)))+
-      facet_wrap(~yr)+
-      theme(panel.spacing = unit(0, "lines"),
-            strip.text.x = element_blank(),
-            strip.background = element_blank()) -> plot_list[[grep(i, fleets)]]
-  }}
+            strip.background = element_blank()) -> x
   
-  # write plots to directory
-  purrr::map2(file_path, plot_list, ggsave, height = height, width = width, units = "in")
+  # write plot to directory
+  ggsave(file_path, plot = x,  height = height, width = width, units = "in")
+  
+  return(x)
+  }
+## age comp fit
+f_plot_agecomp <- function(dirs, models, fleet_num, prefix, height = 7, width = 7) {
+  ## load all rep files
+  biglist <- SSgetoutput(dirvec = dirs, verbose = F)
+  
+  
+  ## prep data
+  tibble(model = 1:length(biglist),
+         replist = biglist) %>%
+    ## extract comps
+    mutate(age_comp = purrr::map(replist, function(x){return(x$condbase %>% as_tibble)}),
+           scenario = models[model]) %>%
+    dplyr::select(scenario, age_comp) %>%
+    unnest(age_comp) %>% dplyr::select(-Sex) %>%
+    rename_all(tolower) %>%
+    filter(fleet == fleet_num) -> tmp
+  
+  for(i in models){
+    tmp %>% filter(scenario == i) %>%
+      ggplot()+
+      geom_point(aes(x = bin, y = lbin_lo, color = pearson))+
+      scale_color_gradient2(low = "red", mid = "white", high = "blue")+
+      geom_text_npc(aes(npcx = "left", npcy = "top", label = yr), check_overlap = T)+
+      #geom_text_npc(aes(npcx = "right", npcy = "top", label = annotation), check_overlap = T, size = 3)+
+      labs(x = "Age", y = "Shell Height (cm)", color = NULL)+
+      scale_y_continuous(limits = c(0, 20))+
+      facet_wrap(~yr, ncol = 3)+
+      theme(panel.spacing = unit(0, "lines"),
+            strip.text.x = element_blank(),
+            strip.background = element_blank()) -> x
+    
+    # write plot to directory
+    ggsave(file.path(prefix, paste0(i, "_", "fleet",fleet_num, "_age_comp_resid.png")), plot = x,  
+           height = height, width = width, units = "in")
+    
+  }
+  
+  # shell height bins
+  tibble(lbin_lo = 1:33,
+         sh = seq(2.0, 18.0, 0.5)) -> pop_bin
+  
+  
+  ## prep data
+  tibble(model = 1:length(biglist),
+         replist = biglist) %>%
+    ## extract comps
+    mutate(age_comp = purrr::map(replist, function(x){return(x$age_comp_fit_table %>% as_tibble)}),
+           scenario = models[model]) %>%
+    dplyr::select(scenario, age_comp) %>%
+    unnest(age_comp) %>% 
+    rename_all(tolower) %>%
+    left_join(pop_bin) %>%
+    filter(fleet == fleet_num) %>%
+    ggplot()+
+    geom_point(aes(x = sh, y = all_obs_mean))+
+    geom_line(aes(x = sh, y = all_exp_mean, color = scenario, linetype = scenario))+
+    geom_text_npc(aes(npcx = "left", npcy = "top", label = yr), check_overlap = T)+
+    labs(x = "Shell Height (cm)", y = "Mean Age", color = NULL, linetype = NULL)+
+    facet_wrap(~yr, ncol = 3)+
+    theme(panel.spacing = unit(0, "lines"),
+          strip.text.x = element_blank(),
+          strip.background = element_blank()) -> x
+  
+  # write plot to directory
+  ggsave(file.path(prefix, paste0("fleet", fleet_num, "_age_comp_fit.png")), plot = x,  
+         height = height, width = width, units = "in")
+  
+  
+  
   
 }
 ## recruimtent by model scenario
-f_plot_recruit_comparison <- function(summaryoutput, models = mod_names, file_path, ylim = c(NA, NA)) {
+f_plot_recruit <- function(summaryoutput, models = mod_names, file_path, ylim = c(NA, NA)) {
  
   # estimate
   summaryoutput$recruits %>%
@@ -253,7 +371,7 @@ f_plot_recruit_comparison <- function(summaryoutput, models = mod_names, file_pa
     scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
     yr_axis+
     coord_cartesian(ylim = ylim)+
-    theme(legend.justification = c(1, 1), legend.position = c(1, 1)) -> x
+    theme(legend.justification = c(0, 1), legend.position = c(0, 1)) -> x
   
   # write plot to directory
   ggsave(file_path, plot = x,  height = 3, width = 5, units = "in")
@@ -262,9 +380,9 @@ f_plot_recruit_comparison <- function(summaryoutput, models = mod_names, file_pa
   
 }
 ## rec devs by model scenario
-f_plot_recdev_comparison <- function(summaryoutput, models = mod_names, file_path, 
-                                     legend.justification = c(1, 1), legend.position = c(1, 1),
-                                     height = 3, width = 5) {
+f_plot_recdev <- function(summaryoutput, models = mod_names, file_path, 
+                                     legend.justification = c(0, 1), legend.position = c(0, 1),
+                                     height = 4, width = 6) {
   
   # estimate
   summaryoutput$recdevs %>%
@@ -304,6 +422,84 @@ f_plot_recdev_comparison <- function(summaryoutput, models = mod_names, file_pat
   return(x)
   
 }
+## plot n matrix
+f_plot_n_matrix <- function(model_name, dir, file_path) {
+  
+  rep <- SS_output(dir = dir, verbose = T, printstats = T)
+  
+  # n at age matrix
+  rep$natage %>%
+    filter(`Beg/Mid` == "B") %>%
+    dplyr::select(-1:-7, -9:-12) %>%
+    pivot_longer(2:ncol(.), names_to = "age", values_to = "n") %>%
+    rename(yr = Yr) %>%
+    mutate(age = factor(age, levels = 0:18),
+           n = n / 1e3) %>%
+    ggplot()+
+    geom_point(aes(x = yr, y = age, size = n), shape = 21, fill = "grey70")+
+    labs(x = NULL, y = "Age (yr)", size = NULL)+
+    scale_x_continuous(breaks = yr_axis$breaks, labels = yr_axis$labels)+
+    scale_size(breaks = seq(0, 90, 20))+
+    theme(legend.position = "top") -> x
+  
+  # n at sh matrix
+  rep$natlen %>%
+    filter(`Beg/Mid` == "B") %>%
+    dplyr::select(-1:-7, -9:-12) %>%
+    pivot_longer(2:ncol(.), names_to = "sh", values_to = "n") %>%
+    rename(yr = Yr) %>%
+    mutate(n = n / 1e3,
+           sh = as.numeric(sh)) %>%
+    ggplot()+
+    geom_point(aes(x = yr, y = sh, size = n), shape = 21, fill = "grey70")+
+    labs(x = NULL, y = "Shell Height (cm)", size = NULL)+
+    scale_x_continuous(breaks = yr_axis$breaks, labels = yr_axis$labels)+
+    scale_size(breaks = c(5, 10, 15, 20))+
+    theme(legend.position = "top") -> y
+  
+  # save plots
+  ggsave(file.path(file_path, paste0(model_name, "_begin_natage.png")), plot = x, height = 4, width = 6, units = "in")
+  ggsave(file.path(file_path, paste0(model_name, "_begin_natlen.png")), plot = y, height = 4, width = 6, units = "in")
+  
+  
+}
+
+## extract likelihood components
+f_extract_likelihood_comp <- function(mod_dir){
+  
+  ## read the model output and print some diagnostic messages 
+  replist <- SS_output(dir = mod_dir, verbose=F, printstats=F)
+  
+  replist$likelihoods_by_fleet %>%
+    as_tibble() %>%
+    filter(!is.na(ALL)) %>%
+    # remove all column
+    dplyr::select(-ALL) %>%
+    pivot_longer(c(2:ncol(.))) %>%
+    rename_all(~c("process", "fleet", "nll")) %>%
+    bind_rows(replist$likelihoods_used %>%
+                rownames_to_column() %>% transmute(process = rowname, nll = values) %>%
+                filter(process %in% c("TOTAL", "Recruitment", "Parm_priors", "Parm_devs"))) -> out
+  return(out)
+}
+
+## extract parameter estimates
+f_extract_par_status <- function(mod_dir){
+  
+  ## read the model output and print some diagnostic messages 
+  replist <- SS_output(dir = mod_dir, verbose=TRUE, printstats=TRUE)
+  
+  ## extract estimated parameters excluding devs
+  replist$parameters %>%
+    as_tibble() %>%
+    rename_all(tolower) %>%
+    #filter(status != "act") %>%
+    dplyr::select(label, value, parm_stdev, status, min, max, gradient) %>%
+    
+    write_csv(., file.path(mod_dir, "parameter_status.csv"))
+  
+}
+
 ## args:
 ### retro_summary - model summary from r4ss
 ### terminal_yrs - retro model terminal years in decending order
@@ -321,9 +517,9 @@ f_plot_retro <- function(retro_summary, terminal_yrs, file_path) {
     rename(ssb_all_yr = ssb) %>%
     dplyr::select(prediction_yr, ssb_all_yr) %>%
     left_join(tmp_ssb, by = "prediction_yr") %>%
-    filter(prediction_yr == end_yr,
-           end_yr != 2018) %>%
-    mutate(rho = (ssb - ssb_all_yr) / ssb_all_yr) %>%
+    filter(prediction_yr <= end_yr,
+           end_yr != terminal_yrs[1]) %>% 
+    mutate(rho = (ssb - ssb_all_yr) / ssb_all_yr) %>% 
     pull(rho) %>% mean %>% round(., 3) -> mohns_rho_ssb
   ## ssb plot
   tmp_ssb %>%
@@ -335,10 +531,10 @@ f_plot_retro <- function(retro_summary, terminal_yrs, file_path) {
     viridis::scale_color_viridis(discrete = TRUE)+
     labs(x = NULL, y = "Spawning Biomass (t)", color = NULL, linetype = NULL)+
     scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
-    geom_text_npc(aes(npcx = "left", npcy = "top", label = paste0("Mohn's rho = ", mohns_rho_ssb)), 
+    geom_text_npc(aes(npcx = "right", npcy = "top", label = paste0("Mohn's rho = ", mohns_rho_ssb)), 
                   check_overlap = T)+
     yr_axis -> plot_ssb
-  ggsave(file.path(file_path, "retro_ssb.png"), plot = plot_ssb, height = 3, width = 5.5, units = "in")
+  ggsave(file.path(file_path, "retro_ssb.png"), plot = plot_ssb, height = 3, width = 6, units = "in")
   ## gather recruitment data
   retro_summary$recruits %>%
     dplyr::select(-Label) %>%
@@ -351,8 +547,8 @@ f_plot_retro <- function(retro_summary, terminal_yrs, file_path) {
     rename(rec_all_yr = rec) %>%
     dplyr::select(prediction_yr, rec_all_yr) %>%
     left_join(tmp_rec, by = "prediction_yr") %>%
-    filter(prediction_yr == end_yr,
-           end_yr != 2018) %>%
+    filter(prediction_yr <= end_yr,
+           end_yr != terminal_yrs[1]) %>%
     mutate(rho = (rec - rec_all_yr) / rec_all_yr) %>%
     pull(rho) %>% mean %>% round(., 3) -> mohns_rho_rec
   ## rec plots
@@ -365,45 +561,15 @@ f_plot_retro <- function(retro_summary, terminal_yrs, file_path) {
     viridis::scale_color_viridis(discrete = TRUE)+
     labs(x = NULL, y = "Recruitment (thousands)", color = NULL, linetype = NULL)+
     scale_y_continuous(labels = scales::comma, breaks = scales::pretty_breaks(5))+
-    geom_text_npc(aes(npcx = "left", npcy = "top", label = paste0("Mohn's rho = ", mohns_rho_rec)), 
+    geom_text_npc(aes(npcx = "right", npcy = "top", label = paste0("Mohn's rho = ", mohns_rho_rec)), 
                   check_overlap = T)+
     yr_axis -> plot_rec
-  ggsave(file.path(file_path, "retro_rec.png"), plot = plot_rec, height = 3, width = 5.5, units = "in")
+  ggsave(file.path(file_path, "retro_rec.png"), plot = plot_rec, height = 3, width = 6, units = "in")
   
 }
 
 
 
-f_extract_par_status <- function(mod_dir){
-  
-  ## read the model output and print some diagnostic messages 
-  replist <- SS_output(dir = mod_dir, verbose=TRUE, printstats=TRUE)
-  
-  ## extract estimated parameters excluding devs
-  replist$parameters %>%
-    as_tibble() %>%
-    rename_all(tolower) %>%
-    filter(phase > 0, status != "act") %>%
-    dplyr::select(label, value, parm_stdev, status, gradient) %>%
-    
-    write_csv(., file.path(mod_dir, "parameter_status.csv"))
-  
-}
-f_extract_likelihood_comp <- function(mod_dir){
-  
-  ## read the model output and print some diagnostic messages 
-  replist <- SS_output(dir = mod_dir, verbose=TRUE, printstats=TRUE)
-  
-  replist$likelihoods_by_fleet %>%
-    as_tibble() %>%
-    filter(!is.na(ALL)) %>%
-    # remove all column
-    dplyr::select(-ALL) %>%
-    pivot_longer(c(2:ncol(.))) %>%
-    rename_all(~c("process", "fleet", "nll")) %>%
-    
-    write_csv(., file.path(mod_dir, "likelihood_components_by_fleet.csv"))
-}
 
 
 

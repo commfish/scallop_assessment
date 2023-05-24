@@ -7,6 +7,7 @@
 # load libraries ----
 library(here)
 library(lubridate)
+library(patchwork)
 library(scales)
 library(tidyverse)
 library(mgcv)
@@ -24,7 +25,7 @@ f_catch_rename <- function(x){
                 "set_lon", "statarea", "depth", "dredge_count", 
                 "dredge_width", "dredge_down", "dredge_up", "duration", 
                 "dredge_hrs", "haul_speed", "distance_nm", "area_swept", 
-                "rtnd_basket", "round_weight", "meat_weight", "est_yield",
+                "rtnd_basket", "scallop_count", "round_weight", "meat_weight", "est_yield",
                 "tot_rtnd_basket", "tot_day_meat_weight")
   x
 }
@@ -69,6 +70,10 @@ f_add_season <- function(x, fishery_col = "fishery"){
     mutate(season = ifelse(season < 80, season + 2000, season + 1900),
            season = factor(paste0(season, "/", substring(season + 1, 3, 4)))) %>%
     bind_cols(x)
+}
+
+f_season_yr <- function(season){
+  as.numeric(substring(season, 1, 4))
 }
 
 # revise district to align with current mgmt structure
@@ -209,17 +214,18 @@ f_clean_meat <-function(x, catch){
 ## district - abbrev. for any districts to summarise over
 ## ghl - logical include cmobine ghl. Default = F
 ## path - optional. Writes .csv file to path provided
-f_fish_stats <- function(x, district, add_ghl = F, path){
+f_fish_stats <- function(x, dist, add_ghl = F, path){
   # add Season if it is not found
   if(!("season" %in% names(x))) {x <- add_season(x)}
   # summarize catch data
   x %>%
-    # filter to area D
-    filter(district %in% district) %>%
+    # filter to district
+    filter(district %in% dist) %>%
     # summarise data 
     group_by(season) %>%
-    summarise(mt_wt = sum(meat_weight, na.rm = T),
-              rnd_wt = sum(round_weight, na.rm = T),
+    summarise(mt_wt = round(sum(meat_weight, na.rm = T)),
+              rnd_wt = round(sum(round_weight, na.rm = T)),
+              rnd_num = round(sum(scallop_count, na.rm = T)),
               dredge_hrs = sum(dredge_hrs, na.rm = T),
               number_hauls = n(),
               mw_cpue = mt_wt / dredge_hrs,
@@ -229,11 +235,11 @@ f_fish_stats <- function(x, district, add_ghl = F, path){
     if(!exists("ghl")){stop("tibble named 'ghl' not found")}
     else{
     ghl %>%
-      filter(district %in% district) %>%
+      filter(district %in% dist) %>%
       group_by(season) %>%
       summarise(ghl = sum(ghl, na.rm = T)) %>%
       left_join(., tmp, by = "season") %>%
-      replace_na(list(mt_wt = 0, rnd_wt = 0, dredge_hrs = 0, number_hauls = 0)) %>%
+      replace_na(list(mt_wt = 0, rnd_wt = 0, rnd_num = 0, dredge_hrs = 0, number_hauls = 0)) %>%
       filter(as.numeric(substring(season, 1, 4)) > 2008) -> tmp
     }
   }
@@ -312,7 +318,12 @@ f_extent_catch <- function(x, quant = 0.9){
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, Bed, and Vessel
 ### Outputs a point estimate for each season and effects plots of Season, Bed, 
 ### Vessel, and Month
-f_standardize_cpue <- function(x, path){
+### lon - include covariate set_lon T/F
+f_standardize_cpue <- function(x, path, lon = T){
+  mode <- function(x) {
+    ux <- unique(x)
+    ux[which.max(tabulate(match(x, ux)))]
+  }
   
   x %>%
     # filter for only satisfacory dredges
@@ -331,36 +342,65 @@ f_standardize_cpue <- function(x, path){
     filter(complete.cases(.)) -> y
   
   # set reference levels
-  y$bed = relevel(y$bed, mode(y$bed))
-  y$month = relevel(y$month, mode(y$month))
-  y$vessel = relevel(y$vessel, mode(y$vessel))
+  y$bed = relevel(y$bed, as.character(mode(y$bed)))
+  y$month = relevel(y$month, as.character(mode(y$month)))
+  y$vessel = relevel(y$vessel, as.character(mode(y$vessel)))
   
   # fit model
-  mod <- bam(rw_cpue ~ s(depth, k = 4, by = bed)  + s(set_lon, by = bed) + 
-              month + vessel + bed + season, data = y, gamma = 1.4, 
-              family = Gamma(link = log), select = T)
-  # print diagnostics
-  mod_viz <- getViz(mod)
-  print(check(mod_viz,
-        a.qq = list(method = "tnorm",
-                    a.cipoly = list(fill = "light blue")),
-        a.respoi = list(size = 0.5),
-        a.hist = list(bins = 10)))
-  if(!missing(path)){
-  # save vessel, month, Season, and Bed effect
-  n_start <- length(unique(y$bed)) + length(unique(y$bed)) + 1
-  n_end <- n_start + 3
-  png(path, height = 4, width = 7, units = "in", res = 300)
-  print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
-          l_points(size = 1, col = "grey")+
-          l_ciBar(linetype = 1)+
-          l_fitPoints(size = 1, col = 1)+
-          geom_hline(yintercept = 0, linetype = 2)+
-          theme_sleek()+
-          theme(axis.text = element_text(size = 9)), pages = 1)
-  dev.off()
+  if(lon == T) {
+    mod <- bam(rw_cpue ~ s(depth, k = 4, by = bed)  + s(set_lon, by = bed) + 
+                            month + vessel + bed + season, data = y, gamma = 1.4, 
+                          family = Gamma(link = log), select = T)
+    
+    # print diagnostics
+    mod_viz <- getViz(mod)
+    print(check(mod_viz,
+                a.qq = list(method = "tnorm",
+                            a.cipoly = list(fill = "light blue")),
+                a.respoi = list(size = 0.5),
+                a.hist = list(bins = 10)))
+    if(!missing(path)){
+      # save vessel, month, Season, and Bed effect
+      n_start <- length(unique(y$bed)) + length(unique(y$bed)) + 1
+      n_end <- n_start + 3
+      png(path, height = 4, width = 7, units = "in", res = 300)
+      print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
+              l_points(size = 1, col = "grey")+
+              l_ciBar(linetype = 1)+
+              l_fitPoints(size = 1, col = 1)+
+              geom_hline(yintercept = 0, linetype = 2)+
+              theme_sleek()+
+              theme(axis.text = element_text(size = 9)), pages = 1)
+      dev.off()
+    }
+    }
+  else{
+    mod <- bam(rw_cpue ~ s(depth, k = 4, by = bed) + 
+                 month + vessel + bed + season, data = y, gamma = 1.4, 
+               family = Gamma(link = log), select = T)
+    # print diagnostics
+    mod_viz <- getViz(mod)
+    print(check(mod_viz,
+                a.qq = list(method = "tnorm",
+                            a.cipoly = list(fill = "light blue")),
+                a.respoi = list(size = 0.5),
+                a.hist = list(bins = 10)))
+    if(!missing(path)){
+      # save vessel, month, Season, and Bed effect
+      n_start <- length(unique(y$bed)) + 1
+      n_end <- n_start + 3
+      png(path, height = 4, width = 7, units = "in", res = 300)
+      print(plot(mod_viz, allTerms = F, select = (n_start:n_end))+ 
+              l_points(size = 1, col = "grey")+
+              l_ciBar(linetype = 1)+
+              l_fitPoints(size = 1, col = 1)+
+              geom_hline(yintercept = 0, linetype = 2)+
+              theme_sleek()+
+              theme(axis.text = element_text(size = 9)), pages = 1)
+      dev.off()
+    }
   }
-  
+
   # extract year effect
   tibble(par = names(mod$coefficients), 
          est = mod$coefficients,
@@ -371,7 +411,7 @@ f_standardize_cpue <- function(x, path){
            std_cpue = exp(par_est + se/2),
            se = std_cpue * se,
            season = 2000 + as.numeric(levels(y$season))) %>%
-    arrange(season) %>%
+    arrange(as.numeric(as.character(season))) %>%
     dplyr::select(season, par_est, par_se, std_cpue, se) -> out 
   
   return(out)
@@ -386,6 +426,10 @@ f_standardize_cpue <- function(x, path){
 ### path - file path to save plots. Optional, if provided, function saves effect plots of Month, Season, and Vessel
 ### Outputs a point estimate for each season and effects plots of Season, Vessel, and Month
 f_standardize_cpue2 <- function(x, path){
+  mode <- function(x) {
+    ux <- unique(x)
+    ux[which.max(tabulate(match(x, ux)))]
+  }
   
   x %>%
     # filter for only satisfacory dredges
@@ -404,8 +448,8 @@ f_standardize_cpue2 <- function(x, path){
     filter(complete.cases(.)) -> y
   
   # set reference levels
-  y$month = relevel(y$month, mode(y$month))
-  y$vessel = relevel(y$vessel, mode(y$vessel))
+  y$month = relevel(y$month, as.character(mode(y$month)))
+  y$vessel = relevel(y$vessel, as.character(mode(y$vessel)))
   
   # fit model
   mod <- bam(rw_cpue ~ s(depth, k = 4) + s(set_lon) + 
@@ -443,7 +487,7 @@ f_standardize_cpue2 <- function(x, path){
            std_cpue = exp(par_est + se/2),
            se = std_cpue * se,
            season = 2000 + as.numeric(levels(y$season))) %>%
-    arrange(season) %>%
+    arrange(as.numeric(as.character(season))) %>%
     dplyr::select(season, par_est, par_se, std_cpue, se) -> out 
   
   return(out)
@@ -593,7 +637,62 @@ KSE_proj <- coord_quickmap(xlim = c(-155.6, -152.3), ylim = c(55.5, 57.5))
 areaM_proj <- coord_quickmap(xlim = c(-165, -158), ylim = c(53, 56))
 areaO_proj <- coord_quickmap(xlim = c(-169, -164.2), ylim = c(52.5, 54.5))
 areaQ_proj <- coord_quickmap(xlim = c(-176, -164), ylim = c(53, 57.6))
-YAK_proj <- coord_quickmap(xlim = c(-144.5, -136.5), ylim = c(58, 60.5))
+WKI_proj <- coord_quickmap(xlim = c(-145.2, -144), ylim = c(59.5, 60.1))
+EKI_proj <- coord_quickmap(xlim = c(-145, -143), ylim = c(59.5, 60.1))
+YAK_proj <- coord_quickmap(xlim = c(-144.5, -136.5), ylim = c(57, 60.5))
 
 
         
+# plotting functions ----
+
+### custom color/fill pallete
+cb_palette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", 
+                "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# graphic options
+theme_sleek <- function(base_size = 12, base_family = "Times") {
+  
+  windowsFonts(Times=windowsFont("TT Times New Roman"))
+  
+  half_line <- base_size/2
+  
+  theme_light(base_size = base_size, base_family = base_family) +
+    theme(
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.ticks.length = unit(half_line / 2.2, "pt"),
+      strip.background = element_rect(fill = NA, colour = NA),
+      strip.text.x = element_text(colour = "black"),
+      strip.text.y = element_text(colour = "black"),
+      #axis.text = element_text(colour = "grey30"),
+      #axis.title = element_text(colour = "grey30"),
+      #legend.title = element_text(colour = "grey30"),#, size = rel(0.9)
+      panel.border = element_rect(fill = NA),#, colour = "grey70", size = 1),
+      legend.key.size = unit(0.9, "lines"),
+      #legend.text = element_text(size = rel(0.7)),#, colour = "grey30"),
+      legend.key = element_rect(colour = NA, fill = NA),
+      legend.background = element_rect(colour = NA, fill = NA)#,
+      #plot.title = element_text(colour = "grey30"),#, size = rel(1)
+      #plot.subtitle = element_text(colour = "grey30")#, size = rel(.85)
+    )
+  
+}
+
+# Depends on dplyr
+tickr <- function(
+    data, # dataframe
+    var, # column of interest
+    to # break point definition
+) {
+  
+  VAR <- enquo(var) # makes VAR a dynamic variable
+  
+  data %>%
+    dplyr::filter(!is.na(!!VAR)) %>%
+    distinct(!!VAR) %>%
+    mutate(labels = ifelse(!!VAR %in% seq(to * round(min(!!VAR) / to), max(!!VAR), to),
+                           !!VAR, "")) %>%
+    dplyr::select(breaks = UQ(VAR), labels)
+}
+theme_set(theme_sleek())
+yraxis <- tickr(tibble(yr = 1980:2100), yr, 5)
